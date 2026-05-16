@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FaceGrade AI — Student Face Recognition & Grade Management System powered by AWS Rekognition">
+    <title>FaceGrade AI — Face Recognition & Student Grades</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- ═══ SPLASH ═══ -->
+    <div id="splash-screen" class="screen active">
+        <div class="splash-bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="noise"></div></div>
+        <div class="splash-inner">
+            <div class="logo-box">
+                <div class="logo-mark">
+                    <svg viewBox="0 0 48 48" fill="none"><rect x="2" y="2" width="44" height="44" rx="14" stroke="currentColor" stroke-width="2.5"/><circle cx="18" cy="20" r="3" fill="currentColor"/><circle cx="30" cy="20" r="3" fill="currentColor"/><path d="M16 32c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>
+                </div>
+                <h1 class="logo-title">FaceGrade <span>AI</span></h1>
+                <p class="logo-desc">Face Recognition & Student Grade System</p>
+            </div>
+            <div class="mode-grid">
+                <button class="mode-card" onclick="showLogin()">
+                    <span class="mode-emoji">🔑</span>
+                    <strong>Teacher Panel</strong>
+                    <small>Register students, manage grades & faces</small>
+                </button>
+                <button class="mode-card" onclick="go('student')">
+                    <span class="mode-emoji">📸</span>
+                    <strong>Check My Grades</strong>
+                    <small>Scan your face to view grades & poster</small>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ LOGIN ═══ -->
+    <div id="login-modal" class="modal-bg hidden">
+        <div class="modal">
+            <button class="close-x" onclick="hideLogin()">×</button>
+            <h2>🔐 Teacher Login</h2>
+            <div class="field"><label>Username</label><input id="l-user" placeholder="username" onkeydown="loginKeyHandler(event)"></div>
+            <div class="field"><label>Password</label><input id="l-pass" type="password" placeholder="••••••" onkeydown="loginKeyHandler(event)"></div>
+            <p id="l-err" class="err hidden"></p>
+            <button class="btn primary full" onclick="doLogin()">Sign In</button>
+        </div>
+    </div>
+
+    <!-- ═══ TEACHER ═══ -->
+    <div id="teacher-screen" class="screen">
+        <header class="navbar">
+            <div class="nb-logo" onclick="go('splash')">FaceGrade <span>AI</span></div>
+            <nav class="nb-tabs">
+                <button class="nb-tab on" data-t="t-reg" onclick="tab(this)">📝 Register + Grades</button>
+                <button class="nb-tab" data-t="t-list" onclick="tab(this); loadStudents()">📋 All Students</button>
+            </nav>
+            <div class="nb-end"><span class="pill">👨‍🏫 Teacher</span><button class="btn ghost sm" onclick="go('splash')">Logout</button></div>
+        </header>
+
+        <div class="page-body">
+            <!-- Register + Grades Tab (unified) -->
+            <section id="t-reg" class="pane on">
+                <div class="pane-head"><h2>Register New Student</h2><p>Fill details, capture face, and input grades — all in one step</p></div>
+                <div class="two-col">
+                    <div class="card">
+                        <div class="field"><label>Student ID (NIS)</label><input id="r-nis" placeholder="e.g. 2024001"></div>
+                        <div class="field"><label>Full Name</label><input id="r-name" placeholder="e.g. John Doe"></div>
+                        <div class="field"><label>Class</label>
+                            <select id="r-class"><option value="">Select...</option><option>X-A</option><option>X-B</option><option>XI-A</option><option>XI-B</option><option>XII-A</option><option>XII-B</option></select>
+                        </div>
+                        <div class="field"><label>Religion</label>
+                            <select id="r-religion"><option value="">Select...</option><option value="Islam">Islam</option><option value="Kristen">Kristen (Protestant)</option><option value="Katolik">Katolik (Catholic)</option><option value="Hindu">Hindu</option><option value="Budha">Budha (Buddhist)</option><option value="Konghucu">Konghucu (Confucian)</option></select>
+                        </div>
+                        <div class="field"><label>Violations (Pelanggaran)</label>
+                            <input id="r-violations" type="text" placeholder="e.g. Terlambat, Merokok (leave empty if none)">
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>📷 Face Capture</h3>
+                        <div class="cap-toggle">
+                            <button class="cap-btn on" onclick="capMode('cam',this)">Camera</button>
+                            <button class="cap-btn" onclick="capMode('file',this)">Upload</button>
+                        </div>
+                        <div id="cap-cam">
+                            <video id="r-vid" autoplay playsinline></video>
+                            <canvas id="r-cnv" class="hidden"></canvas>
+                            <div id="r-ph" class="placeholder-box"><span>📷</span><p>Click Start Camera below</p></div>
+                            <div class="btn-row">
+                                <button id="btn-cam-start" class="btn secondary" onclick="startRegCam()">Start Camera</button>
+                                <button id="btn-cam-snap" class="btn primary hidden" onclick="snapReg()">Capture</button>
+                                <button id="btn-cam-redo" class="btn ghost hidden" onclick="redoReg()">Retake</button>
+                            </div>
+                        </div>
+                        <div id="cap-file" class="hidden">
+                            <div class="drop-area" onclick="$('r-file').click()"><span>📁</span><p>Click to select photo</p><small>JPG / PNG, max 5MB</small></div>
+                            <input type="file" id="r-file" accept="image/*" class="hidden" onchange="onRegFile(event)">
+                            <img id="r-fprev" class="img-preview hidden">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inline Grades -->
+                <div class="card" style="margin-top:16px">
+                    <h3>📊 Grades <small style="color:var(--text3);font-weight:400">(optional — can add later)</small></h3>
+                    <div class="subjects-grid" id="reg-grades-grid"></div>
+                </div>
+
+                <button class="btn primary lg glow center-btn" onclick="registerStudent()">✅ Register & Save</button>
+                <div id="reg-msg" class="msg-box hidden"></div>
+            </section>
+
+            <!-- Students List Tab (with inline edit) -->
+            <section id="t-list" class="pane">
+                <div class="pane-head"><h2>All Students</h2><p>View, edit grades, and manage records</p></div>
+                <div id="stu-table"><p class="empty-state">Loading...</p></div>
+
+                <!-- Edit Grades Modal -->
+                <div id="edit-modal" class="modal-bg hidden">
+                    <div class="modal" style="max-width:960px; width:100%">
+                        <button class="close-x" onclick="$('edit-modal').classList.add('hidden')">×</button>
+                        <h2 id="edit-title">Edit Grades & Violations</h2>
+                        <div class="field"><label>Violations (Catatan)</label><input type="text" id="e-violations" placeholder="e.g. Terlambat, Merokok"></div>
+                        <div id="edit-grades-grid" class="subjects-grid"></div>
+                        <button class="btn primary full" onclick="saveEditGrades()">💾 Save Grades</button>
+                        <div id="edit-msg" class="msg-box hidden"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ═══ STUDENT ═══ -->
+    <div id="student-screen" class="screen">
+        <header class="navbar student-nb">
+            <div class="nb-logo" onclick="go('splash')">FaceGrade <span>AI</span></div>
+            <button class="btn ghost sm" onclick="go('splash')">← Back</button>
+        </header>
+        <div class="page-body centered">
+            <!-- Scan -->
+            <div id="s-scan">
+                <h1 class="big-title">Check Your Grades</h1>
+                <p class="subtitle">Position your face in the camera and hit Scan</p>
+                <div class="live-cam-wrap">
+                    <video id="s-vid" autoplay playsinline></video>
+                    <canvas id="s-cnv" class="hidden"></canvas>
+                    <div id="s-cam-ph" class="cam-ph-student"><div class="spinner"></div><p>Starting camera...</p></div>
+                </div>
+                <button id="btn-scan-face" class="btn primary lg glow scan-btn" onclick="snapStu()">📸 Scan My Face</button>
+                <div class="upload-alt">
+                    <span class="divider-text">or upload a photo instead</span>
+                    <label class="upload-label" for="s-file">📁 Choose File</label>
+                    <input type="file" id="s-file" accept="image/*" class="hidden" onchange="onStuFile(event)">
+                </div>
+                <div id="s-up-box" class="cam-box hidden">
+                    <img id="s-up-img" class="img-preview-lg">
+                    <div class="btn-row center"><button class="btn primary lg" onclick="scanUpload()">🔍 Scan This Face</button><button class="btn ghost" onclick="closeUpBox()">Cancel</button></div>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="s-loading" class="scan-loader hidden">
+                <div class="scan-anim">
+                    <div class="scan-circle"><div class="scan-line"></div></div>
+                    <div class="scan-dots"><span></span><span></span><span></span></div>
+                </div>
+                <h2>Scanning Face...</h2>
+                <p>Analyzing with AWS Rekognition</p>
+            </div>
+
+            <!-- Face Picker (multi-face) -->
+            <div id="face-picker" class="hidden">
+                <button class="btn ghost" onclick="resetStu()">← New Scan</button>
+                <h2>Detected Faces</h2>
+                <p id="fp-info" class="subtitle"></p>
+                <div class="fp-img-wrap"><img id="fp-img"><div id="fp-boxes"></div></div>
+                <div id="fp-thumbs" class="thumb-row"></div>
+            </div>
+
+            <!-- Result: Known (compact horizontal) -->
+            <div id="res-ok" class="hidden">
+                <div class="res-top-bar">
+                    <button class="btn ghost" onclick="backToFaces()">← Back</button>
+                    <div class="res-avg-pill">Average: <strong id="res-avg-num">—</strong></div>
+                </div>
+                <div class="res-layout">
+                    <div class="res-left">
+                        <div id="poster-area"></div>
+                        <div class="res-identity" id="res-id"></div>
+                        <div id="res-violations" class="violation-list-box hidden"></div>
+                    </div>
+                    <div class="res-right">
+                        <h3>📋 Grade Breakdown</h3>
+                        <div id="res-grades" class="grade-tiles-compact"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result: Unknown -->
+            <div id="res-no" class="hidden">
+                <button class="btn ghost" onclick="backToFaces()">← Back</button>
+                <div class="unknown-layout">
+                    <div class="unknown-visual">
+                        <div class="unknown-face-ring">
+                            <span>❓</span>
+                        </div>
+                        <h2>Face Not Recognized</h2>
+                        <p>Not in the system yet. Contact a teacher to register.</p>
+                    </div>
+                    <div class="unknown-data">
+                        <h3>🔍 Face Analysis</h3>
+                        <div id="face-attrs" class="attrs-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toasts" class="toast-stack"></div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
