@@ -23,12 +23,14 @@ def create_aws_session():
     Create AWS session: tries AWS CLI credentials first (~/.aws/credentials),
     then falls back to environment variables.
     """
+    region = os.getenv('AWS_REGION', 'us-east-1')
+    
     # 1) Try default session (AWS CLI / shared credentials)
     try:
-        sess = boto3.Session()
+        sess = boto3.Session(region_name=region)
         sts = sess.client('sts')
         sts.get_caller_identity()
-        print("[AWS] Using credentials from AWS CLI / shared config")
+        print(f"[AWS] Using credentials from AWS CLI / shared config (Region: {region})")
         return sess
     except (NoCredentialsError, ProfileNotFound, ClientError):
         pass
@@ -37,7 +39,6 @@ def create_aws_session():
     key = os.getenv('AWS_ACCESS_KEY_ID', '')
     secret = os.getenv('AWS_SECRET_ACCESS_KEY', '')
     token = os.getenv('AWS_SESSION_TOKEN', '')
-    region = os.getenv('AWS_REGION', 'ap-southeast-1')
     if key and secret:
         try:
             sess = boto3.Session(
