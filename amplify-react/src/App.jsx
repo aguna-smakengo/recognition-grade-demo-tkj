@@ -212,25 +212,47 @@ export default function App() {
   const startCamera = async (targetRef) => {
     stopCamera();
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
+      const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
       const cams = devices.filter(d => d.kind === 'videoinput');
       setCameras(cams);
 
-      let constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 } } };
+      let constraints = { 
+        video: { 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 } 
+        } 
+      };
+
       if (activeCamId) {
-        constraints.video.deviceId = { exact: activeCamId };
+        constraints.video.deviceId = { ideal: activeCamId };
       } else if (cams.length > 0) {
         const back = cams.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('environment'));
         if (back) {
-          constraints.video.deviceId = { exact: back.deviceId };
+          constraints.video.deviceId = { ideal: back.deviceId };
           setActiveCamId(back.deviceId);
         } else {
-          constraints.video.deviceId = { exact: cams[0].deviceId };
+          constraints.video.deviceId = { ideal: cams[0].deviceId };
           setActiveCamId(cams[0].deviceId);
         }
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (firstErr) {
+        console.warn("First camera attempt failed with constraints, trying fallback facingMode...", firstErr);
+        try {
+          // Fallback 1: Simple facing mode or default cam
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user' } 
+          });
+        } catch (secondErr) {
+          console.warn("Second camera attempt failed, trying absolute fallback video:true...", secondErr);
+          // Fallback 2: Direct absolute default video
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+      }
+
       if (targetRef && targetRef.current) {
         targetRef.current.srcObject = stream;
       }
