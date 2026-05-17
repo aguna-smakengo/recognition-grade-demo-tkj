@@ -63,12 +63,6 @@ resource "aws_lambda_function" "facegrade_api" {
 resource "aws_apigatewayv2_api" "api_gateway" {
   name          = "facegrade-api-gateway"
   protocol_type = "HTTP"
-
-  cors_configuration {
-    allow_origins = ["*"]
-    allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_headers = ["content-type", "authorization"]
-  }
 }
 
 # 5. API Gateway to Lambda Integration
