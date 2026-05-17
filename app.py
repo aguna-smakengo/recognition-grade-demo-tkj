@@ -1,8 +1,46 @@
 import os
 import json
 import base64
-import g4f
 import io
+
+# ═══════════════════════ G4F MONKEY-PATCH FOR SERVERLESS IMPORT ═══════════════════════
+# Some g4f providers (like Airforce) make blocking HTTP network requests during import.
+# To prevent AWS Lambda initialization crashes due to network blocks/Cloudflare,
+# we temporarily mock requests.get during the g4f import process.
+try:
+    import requests
+    _orig_get = requests.get
+    def _mock_get(url, *args, **kwargs):
+        if "api.airforce" in url or "models" in url or "imagine" in url:
+            class MockResponse:
+                def raise_for_status(self):
+                    pass
+                def json(self):
+                    if "imagine" in url:
+                        return []
+                    return {"data": [{"id": "gpt-4o-mini"}]}
+            return MockResponse()
+        try:
+            return _orig_get(url, *args, **kwargs)
+        except Exception:
+            class MockResponse:
+                def raise_for_status(self):
+                    pass
+                def json(self):
+                    return {"data": [], "models": []}
+            return MockResponse()
+    requests.get = _mock_get
+except Exception:
+    pass
+
+import g4f
+
+# Restore original requests.get
+try:
+    requests.get = _orig_get
+except Exception:
+    pass
+# ═════════════════════════════════════════════════════════════════════════════════════
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from flask import Flask, render_template, request, jsonify, send_file
