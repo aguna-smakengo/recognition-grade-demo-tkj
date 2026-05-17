@@ -5,13 +5,18 @@ import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, DeleteComm
 import * as THREE from 'three';
 
 // ── WebGL Three.js Super-Detailed Galaxy Scanner ──
-function ThreeGalaxyScanner({ scanState }) {
+function ThreeGalaxyScanner({ scanState, screen }) {
   const mountRef = useRef(null);
   const scanStateRef = useRef(scanState);
+  const screenRef = useRef(screen);
 
   useEffect(() => {
     scanStateRef.current = scanState;
   }, [scanState]);
+
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -305,32 +310,20 @@ function ThreeGalaxyScanner({ scanState }) {
         scanPlane.position.lerp(soulStarPos, 0.075);
         scanGrid.position.lerp(soulStarPos, 0.075);
         laserLine.position.lerp(soulStarPos, 0.075);
-      } else if (scanStateRef.current === 'result-ok' || scanStateRef.current === 'result-no') {
-        // Slow majestic cosmic orbit camera rotating behind the transparent dashboard cards!
-        const targetCamX = Math.sin(elapsedTime * 0.04) * 11;
-        const targetCamZ = 16 + Math.cos(elapsedTime * 0.04) * 4;
-        camera.position.lerp(new THREE.Vector3(targetCamX, 9, targetCamZ), 0.025);
-        camera.lookAt(0, 0.4, 0);
-        
-        // Hide the sweeping scanning beams when not scanning!
-        scanPlane.position.set(0, -999, 0);
-        scanGrid.position.set(0, -999, 0);
-        laserLine.position.set(0, -999, 0);
-        material.size = 0.13;
-      } else {
-        // Normal scanning translation (left to right scanning)
+
+        scanPlane.visible = true;
+        scanGrid.visible = true;
+        laserLine.visible = true;
+      } else if (scanStateRef.current === 'loading') {
+        // Normal scanning translation (left to right scanning) ONLY during active cognitive scanning
         const sweep = Math.sin(elapsedTime * 1.5) * 7.5;
-        scanPlane.position.x = sweep;
-        scanPlane.position.y = 0;
-        scanPlane.position.z = 0;
+        scanPlane.position.set(sweep, 0, 0);
+        scanGrid.position.set(sweep, 0, 0);
+        laserLine.position.set(sweep, 0, 0);
 
-        scanGrid.position.x = sweep;
-        scanGrid.position.y = 0;
-        scanGrid.position.z = 0;
-
-        laserLine.position.x = sweep;
-        laserLine.position.y = 0;
-        laserLine.position.z = 0;
+        scanPlane.visible = true;
+        scanGrid.visible = true;
+        laserLine.visible = true;
 
         // Reset particle size
         material.size = 0.14;
@@ -340,6 +333,32 @@ function ThreeGalaxyScanner({ scanState }) {
         const targetCamZ = 15 + Math.cos(elapsedTime * 0.2) * 3;
         camera.position.lerp(new THREE.Vector3(targetCamX, 10, targetCamZ), 0.05);
         camera.lookAt(0, 0, 0);
+      } else {
+        // Completely HIDE scanning grids, sweeping beams and lasers during camera live preview ('scan') or dashboard results ('result-ok', 'result-no')
+        scanPlane.position.set(0, -999, 0);
+        scanGrid.position.set(0, -999, 0);
+        laserLine.position.set(0, -999, 0);
+
+        scanPlane.visible = false;
+        scanGrid.visible = false;
+        laserLine.visible = false;
+
+        material.size = 0.13;
+
+        // Dynamically adjust camera positioning based on whether we are showing the side-split menu (splash) or centered screens
+        if (screenRef.current === 'splash') {
+          // Framed beautifully on the right side of the screen
+          const targetCamX = 4.2 + Math.sin(elapsedTime * 0.03) * 1.5;
+          const targetCamZ = 12.0 + Math.cos(elapsedTime * 0.03) * 1.5;
+          camera.position.lerp(new THREE.Vector3(targetCamX, 6.5, targetCamZ), 0.025);
+          camera.lookAt(-1.2, 0.2, 0);
+        } else {
+          // Centered majestic slow cosmic orbit
+          const targetCamX = Math.sin(elapsedTime * 0.04) * 11;
+          const targetCamZ = 16 + Math.cos(elapsedTime * 0.04) * 4;
+          camera.position.lerp(new THREE.Vector3(targetCamX, 9, targetCamZ), 0.025);
+          camera.lookAt(0, 0.4, 0);
+        }
       }
 
       renderer.render(scene, camera);
@@ -1398,7 +1417,8 @@ export default function App() {
     setEditCustomTagline(s.customTagline || '');
     const initialGrades = {};
     SUBJECTS.forEach(sub => {
-      initialGrades[sub.key] = s.grades && s.grades[sub.key] !== undefined ? s.grades[sub.key] : '';
+      const val = getGradeValue(s, sub.key);
+      initialGrades[sub.key] = val !== '-' ? val : '';
     });
     setEditGrades(initialGrades);
   };
@@ -1543,7 +1563,7 @@ export default function App() {
                   setScanState('result-ok');
                   document.body.classList.remove('warp-jump');
                   setTimeout(() => setShowWarpFlash(false), 1200);
-                }, 2200); // Epic 2.2s zoom pan lock-on sequence
+                }, 800); // Super snappy 800ms zoom pan lock-on sequence
               } else {
                 setMatchedPhoto(base64);
                 setScanState('zooming');
@@ -1554,7 +1574,7 @@ export default function App() {
                   showUnknownResult(base64, detected);
                   document.body.classList.remove('warp-jump');
                   setTimeout(() => setShowWarpFlash(false), 1200);
-                }, 2200);
+                }, 800);
               }
             } catch (dbErr) {
               setMatchedPhoto(base64);
@@ -1566,7 +1586,7 @@ export default function App() {
                 showUnknownResult(base64, detected);
                 document.body.classList.remove('warp-jump');
                 setTimeout(() => setShowWarpFlash(false), 1200);
-              }, 2200);
+              }, 800);
             }
           } else {
             setMatchedPhoto(base64);
@@ -1578,7 +1598,7 @@ export default function App() {
               showUnknownResult(base64, detected);
               document.body.classList.remove('warp-jump');
               setTimeout(() => setShowWarpFlash(false), 1200);
-            }, 2200);
+            }, 800);
           }
         });
       });
@@ -1696,308 +1716,249 @@ export default function App() {
 
     let result = null;
 
+    // Find the highest grade among all mapels
+    let bestSubject = 'math';
+    let highestGrade = 0;
+    Object.entries(grades).forEach(([k, v]) => {
+      if (typeof v === 'number' && !isNaN(v) && v > highestGrade) {
+        highestGrade = v;
+        bestSubject = k;
+      }
+    });
+
     // =========================================================================
-    // PRIORITY 1: HOLY SINNER (Jalur Langit Kenceng, Tapi Kelakuan Minus)
-    // Kondisi: Nilai Agama tinggi (>= 85) TAPI pelanggarannya banyak (>= 3)
+    // PRIORITY 1: SENSATIONAL ACADEMIC ACHIEVERS (PRESTASI DIUTAMAKAN!)
+    // If the student has at least one mapel with grade >= 85
     // =========================================================================
-    if (grades.rel >= 85 && violations >= 3) {
-      if (agama === 'islam') {
-        const prefixes = ["Gus", "Ustadz", "Habib", "Kyai", "Syekh", "Ustadz Gaul", "Mubaligh", "Imam", "Khatib", "Santri"];
-        const suffixes = ["Mafia", "Warnet", "Kantin", "Nakal", "Santuy", "Mabar", "Rebahan", "Gacha", "TikTok", "Senja"];
+    if (highestGrade >= 85) {
+      // 1.1 Bule Jawa Custom Hybrid (English & Javanese are both high!)
+      if (grades.eng >= 85 && grades.jawa >= 85) {
+        const prefixes = ["Bule", "Lord", "Priyayi", "Mister", "Ndalem", "Den Bagus", "Raden", "Sir", "Gusti"];
+        const suffixes = ["Medok", "Ndeso", "Jaksel", "Jowo", "Ningrat", "Blasteran", "Mangkubumi", "Suroboyo"];
         const taglines = [
-          "Surga dipertahankan via nilai rapot, tata tertib sekolah dihancurkan via tongkrongan.",
-          "Hafalan ayat suci lancar jaya, tapi adab masuk gerbang jam 7 pagi masih butuh diruqyah massal.",
-          "IPK agama jalur langit aman, sayangnya buku catetan BK jalur bumi makin tebel aja.",
-          "Rajin sholat dhuha di masjid sekolah, tapi abis itu bolos ke warkop belakang pagar."
+          "Which is kulo niku saestu mumet jal! So hard but monggo pinarak, literally!",
+          "Honestly ya, nek pancen jodoh yo ndak sengaja ketemu di angkringan, my bad yo!",
+          "I am sorry ndak sengaja kulo niku medok sanget, brother! Basic-nya priyayi modern!",
+          "Literally kulo niku tresno banget kalih panjenengan, deeply falling in love lur!",
+          "In contrast, kulo niku mboten ngertos literally artine nopo jal. Monggo sekecaaken!"
         ];
         result = {
           title: generateTitle(prefixes, suffixes),
           tagline: getRandom(taglines),
-          theme: "islam",
-          bgClass: "bg-islam-2",
-          stamp: true
+          theme: "bjawa",
+          bgClass: "bg-math-3",
+          stampText: "LEGEND MEDOK",
+          stampClass: "prestas-stamp gold"
         };
-      } else if (agama === 'kristen' || agama === 'katolik') {
-        const prefixes = ["Romo", "Pendeta", "Diakon", "Paus", "Bapak", "Frater", "Suster", "Duta", "Gembala"];
-        const suffixes = ["Gaul", "Barbar", "Mabar", "Nongkrong", "Bolos", "Santuy", "Gamer", "Konser", "Gitar"];
+      }
+      // 1.2 Math / IPAS Genius
+      else if (bestSubject === 'math' || bestSubject === 'ipas') {
+        const prefixes = ["Albert", "Dewa", "Suhu", "Lord", "Profesor", "Doktor", "Ahli", "Kalkulator"];
+        const suffixes = ["Einstein", "Rumus", "Fisika", "Angka", "Kalkulus", "Aljabar", "Atom", "Semesta"];
         const taglines = [
-          "Pelayanan gereja hari Minggu nomor satu, cabut kelas Matematika hari Senin jalan terus! Haleluya!",
-          "Memberkati tongkrongan kantin walau dosa telat masuk kelas numpuk setinggi Gunung Sinai.",
-          "Rajin sekolah minggu, tapi kalau udah mabar di kelas kelakuannya bikin malaikat *facepalm*.",
-          "Kolekte lancar jaya, tapi uang kas kelas ditilep buat jajan mendoan anget."
+          "Otak penuh rumus fisika kuantum sampai lupa caranya bersosialisasi dengan manusia bumi biasa.",
+          "Bisa ngitung jarak bumi ke matahari, tapi gak bisa ngitung jarak nembak doi biar diterima.",
+          "Kalkulator berjalan kelas yang selalu jadi sasaran tembak contekan pas ujian dadakan.",
+          "Menghabiskan waktu istirahat dengan memikirkan teori relativitas daripada memikirkan gebetan."
         ];
         result = {
           title: generateTitle(prefixes, suffixes),
           tagline: getRandom(taglines),
-          theme: "kristen",
-          bgClass: "bg-kristen-1",
-          stamp: true
+          theme: bestSubject,
+          bgClass: "bg-math-2",
+          stampText: "ELITE SAINS",
+          stampClass: "prestas-stamp cyan"
         };
-      } else {
-        // Default Agama (Hindu/Buddha/Lainnya) dengan anomali
-        const prefixes = ["Suhu", "Biksu", "Pandita", "Resi", "Mahaguru", "Dewa", "Biku"];
-        const suffixes = ["Merusuh", "Nakal", "Barbar", "Pemberontak", "Gokil", "Santai"];
+      }
+      // 1.3 Indo / Eng Sastra Masters
+      else if (bestSubject === 'indo' || bestSubject === 'eng') {
+        const prefixes = ["Pujangga", "Penyair", "Duta", "Raja", "Sastrawan", "Novelis", "Penyair", "Komunikator"];
+        const suffixes = ["Kelas", "Gombal", "Senja", "Kata", "Bucin", "Sastra", "Drama", "Pantun"];
+        const taglines = [
+          "Membuat untaian puisi indah nan puitis semata-mata untuk merayu nilai tugas dari guru killer.",
+          "Bahasa kalbunya lebih tajam dari pedang, hobinya nongkrongin senja sambil ngopi sachet.",
+          "Jago nulis essay panjang lebar, tapi giliran dichat doi balesnya cuma 'Y' doang.",
+          "Ahli menyusun kata-kata mutiara di bio Instagram, walau tugas kelompok bahasa belum selesai."
+        ];
         result = {
           title: generateTitle(prefixes, suffixes),
-          tagline: "Ketenangan batinnya diuji bukan saat meditasi, tapi saat dikejar Guru BK lari keliling lapangan.",
-          theme: "budha",
-          bgClass: "bg-budha-1",
-          stamp: true
+          tagline: getRandom(taglines),
+          theme: bestSubject,
+          bgClass: "bg-bindo-1",
+          stampText: "DUTA BAHASA",
+          stampClass: "prestas-stamp violet"
         };
+      }
+      // 1.4 Art & Aesthetics
+      else if (bestSubject === 'art') {
+        const prefixes = ["Seniman", "Pelukis", "Dewa", "Maestro", "Raja", "Desainer", "Kurator"];
+        const suffixes = ["Estetik", "Kanvas", "Abstrak", "Kuas", "Mural", "Sketsa", "Doodle", "Kreatif"];
+        const taglines = [
+          "Melukis masa depan seindah lukisan pemandangan dua gunung legendaris dan matahari senyum.",
+          "Hidupnya terlalu estetik, sampai buku cetak matematika pun penuh coretan doodle nggak jelas.",
+          "Uang saku abis bukan buat jajan, tapi buat beli spidol warna-warni demi nyatet yang glowing.",
+          "Mengubah coretan meja kelas menjadi karya seni bernilai tinggi yang bikin guru geleng-geleng."
+        ];
+        result = {
+          title: generateTitle(prefixes, suffixes),
+          tagline: getRandom(taglines),
+          theme: "art",
+          bgClass: "bg-seni-1",
+          stampText: "MAESTRO SENI",
+          stampClass: "prestas-stamp gold"
+        };
+      }
+      // 1.5 PE & Athletics
+      else if (bestSubject === 'pe') {
+        const prefixes = ["Atlet", "Panglima", "Raja", "Gladiator", "Dewa", "Juara", "Pelari", "Otot"];
+        const suffixes = ["Zumba", "Lari", "Keringat", "Futsal", "Tarkam", "Lapangan", "Maraton", "Stamina"];
+        const taglines = [
+          "Skill lari dari kenyataan hidup jauh lebih kencang daripada lari keliling lapangan bola.",
+          "Badan kekar jiwa Rambo, tapi kalau disuruh ngerjain logaritma langsung berubah jadi hello kitty.",
+          "Bawa baju ganti olahraga tiap hari walau jadwalnya lagi biologi. Pokoknya keringetan nomer satu!",
+          "Penguasa lapangan futsal sekolah, walau kalau ulangan harian pegang pensilnya gemeteran."
+        ];
+        result = {
+          title: generateTitle(prefixes, suffixes),
+          tagline: getRandom(taglines),
+          theme: "pe",
+          bgClass: "bg-penjas-1",
+          stampText: "ATLET KOSMIK",
+          stampClass: "prestas-stamp green"
+        };
+      }
+      // 1.6 Javanese Culture Masters
+      else if (bestSubject === 'jawa') {
+        const prefixes = ["Ningrat", "Raja", "Sultan", "Dewa", "Dalang", "Priyayi", "Pujangga", "Ksatria"];
+        const suffixes = ["Jowo", "Krama", "Keraton", "Wayang", "Sinden", "Wiguna", "Mangkunegara", "Sastra"];
+        const taglines = [
+          "Melestarikan budaya adiluhung Jawa di tengah gempuran tren joget TikTok modern.",
+          "Tata krama bicaranya sehalus krama alus keraton, bikin hati mertua langsung meleleh.",
+          "Ahli menulis aksara jawa lebih cepat daripada menulis pesan teks WhatsApp ke gebetan.",
+          "Jiwa priyayi sejati yang selalu tenang menghadapi segala ujian hidup dan matematika."
+        ];
+        result = {
+          title: generateTitle(prefixes, suffixes),
+          tagline: getRandom(taglines),
+          theme: "bjawa",
+          bgClass: "bg-math-3",
+          stampText: "PRIYAYI JOWO",
+          stampClass: "prestas-stamp gold"
+        };
+      }
+      // 1.7 Religious / Spiritual Achiever
+      else if (bestSubject === 'rel') {
+        if (agama === 'islam') {
+          const prefixes = ["Ustadz", "Mubaligh", "Santri", "Imam", "Khatib", "Duta"];
+          const suffixes = ["Gaul", "Digital", "Hijrah", "Keren", "Santuy", "Langit"];
+          result = {
+            title: generateTitle(prefixes, suffixes),
+            tagline: "IPK tinggi hanyalah bonus duniawi, yang penting pahala jalur langit tetap aman sentosa.",
+            theme: "islam",
+            bgClass: "bg-islam-2",
+            stampText: "BINTANG LANGIT",
+            stampClass: "prestas-stamp green"
+          };
+        } else if (agama === 'kristen' || agama === 'katolik') {
+          const prefixes = ["Pendeta", "Gembala", "Frater", "Suster", "Duta"];
+          const suffixes = ["Muda", "Digital", "Melodi", "Gitar", "Santuy", "Kasih"];
+          result = {
+            title: generateTitle(prefixes, suffixes),
+            tagline: "Berdoa di hari Minggu, mabar di hari Senin, tetap menjadi garam dan terang tongkrongan kelas!",
+            theme: "kristen",
+            bgClass: "bg-kristen-1",
+            stampText: "BINTANG LANGIT",
+            stampClass: "prestas-stamp green"
+          };
+        } else {
+          const prefixes = ["Suhu", "Biksu", "Pandita", "Dewa", "Guru"];
+          const suffixes = ["Santuy", "Bijak", "Damai", "Tenang", "Semesta"];
+          result = {
+            title: generateTitle(prefixes, suffixes),
+            tagline: "Harmoni kehidupan terpancar dari ketenangan batinnya saat jam pelajaran kosong ditinggal guru rapat.",
+            theme: "budha",
+            bgClass: "bg-budha-1",
+            stampText: "BINTANG LANGIT",
+            stampClass: "prestas-stamp green"
+          };
+        }
       }
     }
 
     // =========================================================================
-    // PRIORITY 2: BULE JAWA (Anak Senja Nyasar ke Keraton)
-    // =========================================================================
-    if (!result && grades.eng >= 85 && grades.jawa >= 85) {
-      const prefixes = ["Bule", "Lord", "Priyayi", "Mister", "Ndalem", "Den Bagus", "Raden", "Sir", "Gusti"];
-      const suffixes = ["Medok", "Ndeso", "Jaksel", "Jowo", "Ningrat", "Blasteran", "Mangkubumi", "Suroboyo"];
-      const taglines = [
-        "Which is kulo niku saestu mumet jal! So hard but monggo pinarak, literally!",
-        "Honestly ya, nek pancen jodoh yo ndak sengaja ketemu di angkringan, my bad yo!",
-        "I am sorry ndak sengaja kulo niku medok sanget, brother! Basic-nya priyayi modern!",
-        "Literally kulo niku tresno banget kalih panjenengan, deeply falling in love lur!",
-        "In contrast, kulo niku mboten ngertos literally artine nopo jal. Monggo sekecaaken!"
-      ];
-      result = {
-        title: generateTitle(prefixes, suffixes),
-        tagline: getRandom(taglines),
-        theme: "bjawa",
-        bgClass: "bg-math-3"
-      };
-    }
-
-    // =========================================================================
-    // PRIORITY 3: VIOLATION KING/QUEEN (Pemerintahan Kelas & Satir)
+    // PRIORITY 2: ONLY TRIGGER VIOLATION SATIRES IF NO EXCELLENT ACADEMIC GRADE
+    // (If violations > 0 AND highestGrade < 85)
     // =========================================================================
     if (!result && violations > 0) {
-      // TUKANG TIDUR (Satir DPR)
+      // Tukang Tidur
       if (notes.includes('tidur') || notes.includes('turu') || notes.includes('ngantuk')) {
         const prefixes = ["Bupati", "Presiden", "Senator", "Camat", "Menteri", "DPR", "Walikota", "Gubernur", "Lurah", "RT"];
         const suffixes = ["Turu", "Merem", "Ngorok", "Bantal", "Rebahan", "Pules", "Kasur", "Mimpi", "Selimut"];
-        const taglines = [
-          "Latihan simulasi jadi wakil rakyat: merem pas rapat paripurna kelas, bangun minta jajan.",
-          "Menjaga stabilitas alam bawah sadar di tengah gempuran rumus Fisika yang tidak pro rakyat.",
-          "Visi Misi: Memajukan bangsa. Realita: Ketiduran di barisan paling belakang sambil mangap.",
-          "Tidur siang di kelas dengan estetik, mengabaikan papan tulis serasa mengabaikan kritik rakyat."
-        ];
         result = {
           title: generateTitle(prefixes, suffixes),
-          tagline: getRandom(taglines),
+          tagline: "Menjaga stabilitas alam bawah sadar di tengah gempuran rumus Fisika yang tidak pro rakyat.",
           theme: "penjas",
           bgClass: "bg-ips-2",
-          stamp: true
+          stampText: "PRESIDEN TURU",
+          stampClass: "violation-stamp small warning"
         };
       }
-
-      // TUKANG KORUPSI KAS KELAS
+      // Tukang Korupsi Kas
       else if (notes.includes('kas') || notes.includes('nunggak') || notes.includes('uang') || notes.includes('bayar')) {
-        const prefixes = ["Bandar", "Koruptor", "Menteri", "Pejabat", "Mafia", "Bos", "Direktur", "Kolektor", "Kapitalis"];
-        const suffixes = ["Kas", "Nunggak", "Defisit", "Seblak", "Pajak", "Cilik", "Utang", "Bokek", "Krisis"];
-        const taglines = [
-          "Latihan nilep uang kas kelas sejak dini demi membiayai seblak pacar tercinta.",
-          "Hutang kas numpuk sampai 3 semester, tapi gaya hidup di kantin ngalahin Rafathar.",
-          "Pura-pura amnesia stadium akhir kalau bendahara kelas udah jalan bawa buku panjang.",
-          "Mengalirkan dana kas kelas ke sektor riil: beli es teh manis jumbo dan cilok bumbu kacang."
-        ];
+        const prefixes = ["Pejabat", "Mafia", "Kolektor", "Kapitalis", "Direktur"];
+        const suffixes = ["Kas", "Nunggak", "Defisit", "Seblak", "Utang"];
         result = {
           title: generateTitle(prefixes, suffixes),
-          tagline: getRandom(taglines),
+          tagline: "Mengalirkan dana kas kelas ke sektor riil: beli es teh manis jumbo dan cilok bumbu kacang.",
           theme: "ips",
           bgClass: "bg-ips-3",
-          stamp: true
+          stampText: "MAFIA KAS",
+          stampClass: "violation-stamp small warning"
         };
       }
-
-      // TUKANG BOLOS / PENGUASA KANTIN
+      // Tukang Bolos
       else if (notes.includes('bolos') || notes.includes('kantin') || notes.includes('cabut') || notes.includes('makan')) {
-        const prefixes = ["Presiden", "Menteri", "Duta", "Panglima", "Gubernur", "Jenderal", "Kaisar", "Raja", "Pangeran"];
-        const suffixes = ["Kantin", "Gorengan", "Bolos", "Cabut", "Mendoan", "Warkop", "Bakwan", "Es Teh", "Indomie"];
-        const taglines = [
-          "Mengadakan rapat paripurna tertutup dengan Ibu Kantin membahas subsidi es teh manis gratis.",
-          "Hukum rimba berlaku: siapa cepat lari ke kantin pas bel istirahat, dia yang dapat mendoan anget.",
-          "Dedikasi tinggi terhadap perputaran ekonomi kantin melebihi dedikasi pada nilai ijazah.",
-          "Cabut lewat pintu belakang sekolah demi sepiring mi instan hangat rasa kaldu ayam."
-        ];
+        const prefixes = ["Presiden", "Jenderal", "Kaisar", "Raja", "Pangeran"];
+        const suffixes = ["Kantin", "Gorengan", "Bolos", "Mendoan", "Bakwan"];
         result = {
           title: generateTitle(prefixes, suffixes),
-          tagline: getRandom(taglines),
+          tagline: "Hukum rimba berlaku: siapa cepat lari ke kantin pas bel istirahat, dia yang dapat mendoan anget.",
           theme: "seni",
           bgClass: "bg-ips-3",
-          stamp: true
+          stampText: "RAJA BOLOS",
+          stampClass: "violation-stamp small warning"
         };
       }
-
-      // GAMER KELAS / MABAR ML
+      // Gamer Kelas
       else if (notes.includes('ml') || notes.includes('game') || notes.includes('mabar') || notes.includes('hp')) {
-        const prefixes = ["Camat", "Bupati", "Lord", "Dewa", "Suhu", "Pro Player", "Master", "Spesialis", "Ksatria"];
-        const suffixes = ["Mythic", "Epical", "Mabar", "Radiant", "Gacha", "Afk", "Lose Streak", "Savage", "Classic"];
-        const taglines = [
-          "Sekolah cuma sampingan, nge-push rank sampai nembus Mythic Immortal adalah jalan ninjaku.",
-          "Lebih panik pas di-gank musuh di mid-lane daripada di-gank guru matematika pas asik mabar.",
-          "Pecah rank Glory jauh lebih krusial daripada memikirkan nasib matematika bangsa ini.",
-          "Mabar ML sembunyi-sembunyi di bawah laci meja, refleks tangan secepat kilat pas ketahuan guru."
-        ];
+        const prefixes = ["Camat", "Lord", "Dewa", "Pro Player", "Master"];
+        const suffixes = ["Mythic", "Epical", "Mabar", "Gacha", "AFK"];
         result = {
           title: generateTitle(prefixes, suffixes),
-          tagline: getRandom(taglines),
+          tagline: "Sekolah cuma sampingan, nge-push rank sampai nembus Mythic Immortal adalah jalan ninjaku.",
           theme: "informatika",
           bgClass: "bg-info-4",
-          stamp: true
+          stampText: "SANG GAMER",
+          stampClass: "violation-stamp small warning"
         };
       }
-
-      // TELAT MULU
-      else if (notes.includes('telat') || notes.includes('lambat') || notes.includes('gerbang')) {
-        const prefixes = ["Pawang", "Duta", "Raja", "Menteri", "Lord", "Pahlawan", "Suhu", "Pelari"];
-        const suffixes = ["Gerbang", "Telat", "Kesiangan", "Lompat", "Pagar", "Satpam", "Hukuman", "Halaman"];
-        const taglines = [
-          "Sengaja datang jam 8 pagi biar gerbang sekolah serasa dibukain kayak gerbang istana pribadi.",
-          "Alarm HP bunyi jam 5 pagi, tapi nyawanya baru kumpul pas satpam sekolah udah nutup gembok.",
-          "Ahli negosiasi tingkat dewa kalau udah ketangkap satpam di depan gerbang yang dikunci.",
-          "Langganan disuruh hormat tiang bendera di pagi hari sambil merenungi keindahan langit timur."
-        ];
-        result = {
-          title: generateTitle(prefixes, suffixes),
-          tagline: getRandom(taglines),
-          theme: "unknown",
-          bgClass: "bg-ips-1",
-          stamp: true
-        };
-      }
-
-      // DEFAULT VIOLATION
-      if (!result) {
-        const prefixes = ["Duta", "Agen", "Menteri", "Warga", "Pelopor", "Provokator", "Pemberontak"];
-        const suffixes = ["Anomali", "Chaos", "Nakal", "Bandha", "Rusuh", "Sangar", "Huru-Hara"];
+      // Default / Other violations
+      else {
+        const prefixes = ["Agen", "Menteri", "Pelopor", "Provokator", "Pemberontak"];
+        const suffixes = ["Anomali", "Chaos", "Nakal", "Bandha", "Rusuh"];
         result = {
           title: generateTitle(prefixes, suffixes),
           tagline: "Melanggar aturan sekolah hari ini murni demi investasi bahan cerita pas reuni 20 tahun lagi.",
           theme: "unknown",
           bgClass: "bg-unknown-2",
-          stamp: true
+          stampText: "SANG ANOMALI",
+          stampClass: "violation-stamp small warning"
         };
       }
     }
 
     // =========================================================================
-    // PRIORITY 4: HIGH RELIGIOUS GRADE (No heavy violations)
-    // =========================================================================
-    if (!result && grades.rel >= 85) {
-      if (agama === 'islam') {
-        const prefixes = ["Ustadz", "Mubaligh", "Santri", "Imam", "Khatib", "Duta"];
-        const suffixes = ["Gaul", "Digital", "Hijrah", "Keren", "Santuy", "Langit"];
-        result = {
-          title: generateTitle(prefixes, suffixes),
-          tagline: "IPK tinggi hanyalah bonus duniawi, yang penting pahala jalur langit tetap aman sentosa.",
-          theme: "islam",
-          bgClass: "bg-islam-2"
-        };
-      } else if (agama === 'kristen' || agama === 'katolik') {
-        const prefixes = ["Pendeta", "Gembala", "Frater", "Suster", "Duta"];
-        const suffixes = ["Muda", "Digital", "Melodi", "Gitar", "Santuy", "Kasih"];
-        result = {
-          title: generateTitle(prefixes, suffixes),
-          tagline: "Berdoa di hari Minggu, mabar di hari Senin, tetap menjadi garam dan terang tongkrongan kelas!",
-          theme: "kristen",
-          bgClass: "bg-kristen-1"
-        };
-      } else {
-        const prefixes = ["Suhu", "Biksu", "Pandita", "Dewa", "Guru"];
-        const suffixes = ["Santuy", "Bijak", "Damai", "Tenang", "Semesta"];
-        result = {
-          title: generateTitle(prefixes, suffixes),
-          tagline: "Harmoni kehidupan terpancar dari ketenangan batinnya saat jam pelajaran kosong ditinggal guru rapat.",
-          theme: "budha",
-          bgClass: "bg-budha-1"
-        };
-      }
-    }
-
-    // =========================================================================
-    // PRIORITY 5: ANAK PINTER NORMAL TAPI ANEH (Highest Grade)
-    // =========================================================================
-    if (!result) {
-      let best = 'math';
-      let val = 0;
-      Object.entries(grades).forEach(([k, v]) => {
-        if (v > val) {
-          val = v;
-          best = k;
-        }
-      });
-
-      if (val >= 85) {
-        if (best === 'math' || best === 'ipas') {
-          const prefixes = ["Albert", "Dewa", "Suhu", "Lord", "Profesor", "Doktor", "Ahli", "Kalkulator"];
-          const suffixes = ["Einstein", "Rumus", "Fisika", "Angka", "Kalkulus", "Aljabar", "Atom", "Semesta"];
-          const taglines = [
-            "Otak penuh rumus fisika kuantum sampai lupa caranya bersosialisasi dengan manusia bumi biasa.",
-            "Bisa ngitung jarak bumi ke matahari, tapi gak bisa ngitung jarak nembak doi biar diterima.",
-            "Kalkulator berjalan kelas yang selalu jadi sasaran tembak contekan pas ujian dadakan.",
-            "Menghabiskan waktu istirahat dengan memikirkan teori relativitas daripada memikirkan gebetan."
-          ];
-          result = {
-            title: generateTitle(prefixes, suffixes),
-            tagline: getRandom(taglines),
-            theme: best,
-            bgClass: "bg-math-2"
-          };
-        }
-        else if (best === 'indo' || best === 'eng') {
-          const prefixes = ["Pujangga", "Penyair", "Duta", "Raja", "Sastrawan", "Novelis", "Penyair", "Komunikator"];
-          const suffixes = ["Kelas", "Gombal", "Senja", "Kata", "Bucin", "Sastra", "Drama", "Pantun"];
-          const taglines = [
-            "Membuat untaian puisi indah nan puitis semata-mata untuk merayu nilai tugas dari guru killer.",
-            "Bahasa kalbunya lebih tajam dari pedang, hobinya nongkrongin senja sambil ngopi sachet.",
-            "Jago nulis essay panjang lebar, tapi giliran dichat doi balesnya cuma 'Y' doang.",
-            "Ahli menyusun kata-kata mutiara di bio Instagram, walau tugas kelompok bahasa belum selesai."
-          ];
-          result = {
-            title: generateTitle(prefixes, suffixes),
-            tagline: getRandom(taglines),
-            theme: best,
-            bgClass: "bg-bindo-1"
-          };
-        }
-        else if (best === 'art') {
-          const prefixes = ["Seniman", "Pelukis", "Dewa", "Maestro", "Raja", "Desainer", "Kurator"];
-          const suffixes = ["Estetik", "Kanvas", "Abstrak", "Kuas", "Mural", "Sketsa", "Doodle", "Kreatif"];
-          const taglines = [
-            "Melukis masa depan seindah lukisan pemandangan dua gunung legendaris dan matahari senyum.",
-            "Hidupnya terlalu estetik, sampai buku cetak matematika pun penuh coretan doodle nggak jelas.",
-            "Uang saku abis bukan buat jajan, tapi buat beli spidol warna-warni demi nyatet yang glowing.",
-            "Mengubah coretan meja kelas menjadi karya seni bernilai tinggi yang bikin guru geleng-geleng."
-          ];
-          result = {
-            title: generateTitle(prefixes, suffixes),
-            tagline: getRandom(taglines),
-            theme: "art",
-            bgClass: "bg-seni-1"
-          };
-        }
-        else if (best === 'pe') {
-          const prefixes = ["Atlet", "Panglima", "Raja", "Gladiator", "Dewa", "Juara", "Pelari", "Otot"];
-          const suffixes = ["Zumba", "Lari", "Keringat", "Futsal", "Tarkam", "Lapangan", "Maraton", "Stamina"];
-          const taglines = [
-            "Skill lari dari kenyataan hidup jauh lebih kencang daripada lari keliling lapangan bola.",
-            "Badan kekar jiwa Rambo, tapi kalau disuruh ngerjain logaritma langsung berubah jadi hello kitty.",
-            "Bawa baju ganti olahraga tiap hari walau jadwalnya lagi biologi. Pokoknya keringetan nomer satu!",
-            "Penguasa lapangan futsal sekolah, walau kalau ulangan harian pegang pensilnya gemeteran."
-          ];
-          result = {
-            title: generateTitle(prefixes, suffixes),
-            tagline: getRandom(taglines),
-            theme: "pe",
-            bgClass: "bg-penjas-1"
-          };
-        }
-      }
-    }
-
-    // =========================================================================
-    // FALLBACK: RAKYAT BIASA (Nilai Standar, Kelakuan Lurus)
+    // PRIORITY 3: FALLBACK - NPC / RAKYAT BIASA
     // =========================================================================
     if (!result) {
       const prefixes = ["Rakyat", "Warga", "Manusia", "Insan", "Penduduk", "Siswa", "Hamba", "Kader"];
@@ -2005,14 +1966,15 @@ export default function App() {
       const taglines = [
         "Belajar secukupnya, tidur sepuasnya, cita-cita tetap jadi menantu idaman di masa depan.",
         "NPC kelas yang kerjaannya cuma numpang ketawa kalau ada jokes lucu dari cowok belakang.",
-        "Eksistensinya di kelas kayak sinyal provider di pedalaman: ada dan tiada, tapi tetap bertahan hidup.",
-        "Mengalir bersama takdir sekolah, mematuhi semua aturan demi kelancaran tidur siang tanpa BK."
+        "Eksistensinya di kelas kayak sinyal provider di pedalaman: ada dan tiada, tapi tetap bertahan hidup."
       ];
       result = {
         title: generateTitle(prefixes, suffixes),
         tagline: getRandom(taglines),
         theme: "unknown",
-        bgClass: "bg-unknown-3"
+        bgClass: "bg-unknown-3",
+        stampText: "SISWA BIASA",
+        stampClass: "prestas-stamp silver"
       };
     }
 
@@ -2050,6 +2012,9 @@ export default function App() {
 
   return (
     <div>
+      {/* Background Majestic 3D Three.js Galaxy Scanner Canvas */}
+      <ThreeGalaxyScanner scanState={scanState} screen={screen} />
+
       {/* Background Starry Canvas */}
       <canvas id="stars-canvas"></canvas>
       <div id="cursor-glow"></div>
@@ -2074,11 +2039,14 @@ export default function App() {
           <div className="splash-inner">
             <div className="logo-box">
               <div className="logo-mark">
-                <svg viewBox="0 0 48 48" fill="none">
-                  <rect x="2" y="2" width="44" height="44" rx="14" stroke="currentColor" strokeWidth="2.5"/>
-                  <circle cx="18" cy="20" r="3" fill="currentColor"/>
-                  <circle cx="30" cy="20" r="3" fill="currentColor"/>
-                  <path d="M16 32c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 14V8h6M34 8h6v6M40 34v6h-6M14 40H8v-6" stroke="var(--cyan)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="24" cy="24" r="11" stroke="var(--primary)" strokeWidth="1.5" strokeDasharray="3 3"/>
+                  <path d="M18 20h.01M30 20h.01" stroke="var(--cyan)" strokeWidth="4" strokeLinecap="round"/>
+                  <path d="M20 28c1.2 1.5 6.8 1.5 8 0" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                  <circle cx="24" cy="24" r="2.5" fill="var(--cyan)"/>
+                  <circle cx="15" cy="27" r="1.5" fill="var(--primary)"/>
+                  <circle cx="33" cy="27" r="1.5" fill="var(--primary)"/>
                 </svg>
               </div>
               <h1 className="logo-title">FaceGrade <span>AI</span></h1>
@@ -2086,12 +2054,18 @@ export default function App() {
             </div>
             <div className="mode-grid">
               <button className="mode-card" onClick={() => setShowLogin(true)}>
-                <span className="mode-emoji">🔑</span>
+                <svg className="mode-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                </svg>
                 <strong>Teacher Panel</strong>
                 <small>Daftarkan wajah siswa & input nilai</small>
               </button>
               <button className="mode-card" onClick={() => setScreen('student')}>
-                <span className="mode-emoji">📸</span>
+                <svg className="mode-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                  <path d="M12 9a4 4 0 0 0-4 4"/>
+                </svg>
                 <strong>Cek Nilai Saya</strong>
                 <small>Scan wajah untuk lihat nilai & poster kosmik</small>
               </button>
@@ -2288,8 +2262,6 @@ export default function App() {
       {/* ═══ STUDENT SCREEN ═══ */}
       {screen === 'student' && (
         <div className="screen active" id="student-screen" style={{ position: 'relative', overflow: 'hidden' }}>
-          {/* Permanent living 3D WebGL Galaxy background for the student cosmos */}
-          <ThreeGalaxyScanner scanState={scanState} />
 
           <header className="navbar student-nb">
             <div className="nb-logo" onClick={() => setScreen('splash')}>FaceGrade <span>AI</span></div>
@@ -2407,53 +2379,36 @@ export default function App() {
                     ? (numericGrades.reduce((a, b) => a + b, 0) / numericGrades.length).toFixed(1) 
                     : "-";
 
-                  // Determine dynamic stamp text and style class based on violations count
-                  let stampText = "";
-                  let stampClass = "violation-stamp";
-                  if (violations > 0) {
-                    if (violations <= 2) {
-                      stampText = "ADA KASUS";
-                      stampClass = "violation-stamp small warning";
-                    } else if (violations <= 5) {
-                      stampText = "MELANGGAR";
-                      stampClass = "violation-stamp";
-                    } else if (violations <= 7) {
-                      stampText = "KASUS BANYAK";
-                      stampClass = "violation-stamp";
-                    } else if (violations <= 10) {
-                      stampText = "KASUS PARAH";
-                      stampClass = "violation-stamp extreme";
-                    } else {
-                      stampText = "MAFIA SEKOLAH";
-                      stampClass = "violation-stamp extreme";
-                    }
-                  }
+                   const stampText = gen.stampText || "";
+                   const stampClass = gen.stampClass || "prestas-stamp";
 
-                  return (
-                    <div>
-                      <div className="res-top-bar">
-                        <button className="btn ghost" onClick={() => { setScanState('scan'); setTimeout(() => startCamera(studentVideoRef), 100); }}>← Kembali</button>
-                        <div className="res-avg-pill">
-                          Rata-Rata: <strong>{avgVal}</strong>
-                        </div>
-                      </div>
+                   return (
+                     <div>
+                       <div className="res-top-bar">
+                         <button className="btn ghost" onClick={() => { setScanState('scan'); setTimeout(() => startCamera(studentVideoRef), 100); }}>← Kembali</button>
+                         <div className="res-avg-pill">
+                           Rata-Rata: <strong>{avgVal}</strong>
+                         </div>
+                       </div>
 
-                      <div className="res-layout">
-                        <div className="res-left">
-                          
-                          {/* Compact Cosmic Poster */}
-                          <div id="poster-area">
-                            <div className={`poster poster-${gen.theme} ${gen.bgClass}`}>
-                              <div className="poster-bg" style={{ backgroundImage: `url('${matchedPhoto}')` }}></div>
-                              <img className="poster-face" src={matchedPhoto} alt="Student Face" />
-                              {gen.stamp && stampText && (
-                                <div className={stampClass}>
-                                  {stampText}
-                                  <small>
-                                    {matchedStudent.violations_history[matchedStudent.violations_history.length - 1].note}
-                                  </small>
-                                </div>
-                              )}
+                       <div className="res-layout">
+                         <div className="res-left">
+                           
+                           {/* Compact Cosmic Poster */}
+                           <div id="poster-area">
+                             <div className={`poster poster-${gen.theme} ${gen.bgClass}`}>
+                               <div className="poster-bg" style={{ backgroundImage: `url('${matchedPhoto}')` }}></div>
+                               <img className="poster-face" src={matchedPhoto} alt="Student Face" />
+                               {stampText && (
+                                 <div className={stampClass}>
+                                   {stampText}
+                                   {stampClass.includes('violation-stamp') && matchedStudent.violations_history && matchedStudent.violations_history.length > 0 && (
+                                     <small>
+                                       {matchedStudent.violations_history[matchedStudent.violations_history.length - 1].note}
+                                     </small>
+                                   )}
+                                 </div>
+                               )}
                               <div className="poster-body">
                                 <div className="poster-label">{gen.title}</div>
                                 <div className="poster-sub">{matchedStudent.name} | {matchedStudent.kelas}</div>
