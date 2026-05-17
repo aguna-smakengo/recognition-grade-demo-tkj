@@ -1,0 +1,48 @@
+service: facegrade-api
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  timeout: 30
+  memorySize: 512
+  environment:
+    DYNAMODB_TABLE: StudentGrades
+    REKOGNITION_COLLECTION: student-faces
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:DescribeTable
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "arn:aws:dynamodb:*:*:table/StudentGrades"
+        - Effect: Allow
+          Action:
+            - rekognition:*
+          Resource: "*"
+
+functions:
+  api:
+    handler: app.handler
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true

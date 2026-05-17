@@ -9,8 +9,12 @@ from flask import Flask, render_template, request, jsonify
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, ProfileNotFound
 from PIL import Image
+from mangum import Mangum
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
+handler = Mangum(app)
 
 def get_jakarta_time():
     # Mengambil waktu UTC+7 (WIB / Jakarta)
