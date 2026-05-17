@@ -1454,12 +1454,27 @@ export default function App() {
 
                         {/* Identity Box */}
                         <div className="res-identity">
-                          <div className="ri-item"><span className="ri-label">NIS</span><span class="ri-val">{matchedStudent.studentId}</span></div>
-                          <div className="ri-item"><span className="ri-label">Nama</span><span class="ri-val">{matchedStudent.name}</span></div>
-                          <div className="ri-item"><span className="ri-label">Kelas</span><span class="ri-val">{matchedStudent.kelas}</span></div>
-                          <div className="ri-item"><span className="ri-label">Agama</span><span class="ri-val">{matchedStudent.agama}</span></div>
-                          <div className="ri-item"><span className="ri-label">Jumlah Kasus</span><span class="ri-val" style={{ color: matchedStudent.violations_history?.length > 0 ? 'var(--red)' : 'var(--green)' }}>{matchedStudent.violations_history?.length || 0} Kasus</span></div>
+                          <div className="ri-item"><span className="ri-label">NIS</span><span className="ri-val">{matchedStudent.studentId}</span></div>
+                          <div className="ri-item"><span className="ri-label">Nama</span><span className="ri-val">{matchedStudent.name}</span></div>
+                          <div className="ri-item"><span className="ri-label">Kelas</span><span className="ri-val">{matchedStudent.kelas}</span></div>
+                          <div className="ri-item"><span className="ri-label">Agama</span><span className="ri-val">{matchedStudent.agama}</span></div>
+                          <div className="ri-item"><span className="ri-label">Jumlah Kasus</span><span className="ri-val" style={{ color: matchedStudent.violations_history?.length > 0 ? 'var(--red)' : 'var(--green)' }}>{matchedStudent.violations_history?.length || 0} Kasus</span></div>
                         </div>
+
+                        {/* Live Face Analyzer Stats */}
+                        {unknownAttrs && unknownAttrs.length > 0 && (
+                          <div className="unknown-data" style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginTop: '20px' }}>
+                            <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>🔍 Live AI Face Scan:</h4>
+                            <div className="attrs-list" style={{ gap: '8px' }}>
+                              {unknownAttrs.map((attr, i) => (
+                                <div className="attr-row" key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                  <span className="attr-label" style={{ color: 'var(--text3)' }}>{attr.label}</span>
+                                  <span className="attr-val" style={{ fontWeight: 'bold', color: 'var(--text1)' }}>{attr.val}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Violations stamp */}
                         {matchedStudent.violations_history?.length > 0 && (
