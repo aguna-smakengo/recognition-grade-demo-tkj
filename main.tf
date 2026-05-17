@@ -27,7 +27,8 @@ resource "null_resource" "pip_install" {
   }
 
   provisioner "local-exec" {
-    command = "powershell -Command \"Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue; New-Item -ItemType Directory -Path build; pip install -r requirements.txt -t build; Copy-Item app.py build/; Copy-Item -Recurse templates build/; Copy-Item -Recurse static build/\""
+    command     = "Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue; New-Item -ItemType Directory -Path build; pip install -r requirements.txt -t build; Copy-Item app.py build/; Copy-Item -Recurse templates build/; Copy-Item -Recurse static build/"
+    interpreter = ["PowerShell", "-Command"]
   }
 }
 
