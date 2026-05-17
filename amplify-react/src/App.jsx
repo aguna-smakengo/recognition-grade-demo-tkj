@@ -329,7 +329,7 @@ function ThreeGalaxyScanner({ scanState, screen }) {
         material.size = 0.14;
 
         // Stable symmetrical frontal scanning camera view (perfectly aligned with the scanning HUD)
-        camera.position.lerp(new THREE.Vector3(0, 3.2, 14.5), 0.05);
+        camera.position.lerp(new THREE.Vector3(0, 3.2, 14.5), 0.28);
         camera.lookAt(0, 0.4, 0);
       } else {
         // Completely HIDE scanning grids, sweeping beams and lasers during camera live preview ('scan') or dashboard results ('result-ok', 'result-no')
@@ -651,81 +651,7 @@ export default function App() {
         warpFactor = Math.max(1.0, warpFactor - 0.15);
       }
 
-      if (isLoading) {
-        // Draw deep-space scanning galaxy!
-        ctx.fillStyle = 'rgba(6, 6, 19, 0.22)';
-        ctx.fillRect(0, 0, width, height);
-
-        const centerX = width / 2;
-        const centerY = height / 2;
-
-        // 1. Draw 1500 particles barred spiral galaxy in the center
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(time * 0.005); // spiral rotate
-        ctx.scale(1.0, 0.45);      // tilt angle
-
-        loadingGalaxyParticles.forEach(p => {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.fill();
-        });
-        ctx.restore();
-
-        // 2. Draw moving search laser beam sweeping left-and-right across the entire galaxy
-        const scanWidth = width * 0.8;
-        const scanX = centerX + Math.sin(time * 0.02) * (scanWidth * 0.5);
-        
-        // Draw neon vertical scanning beam
-        const beamGrad = ctx.createLinearGradient(scanX - 35, 0, scanX + 35, 0);
-        beamGrad.addColorStop(0, 'rgba(92, 240, 255, 0)');
-        beamGrad.addColorStop(0.5, 'rgba(92, 240, 255, 0.45)');
-        beamGrad.addColorStop(1, 'rgba(92, 240, 255, 0)');
-        
-        ctx.fillStyle = beamGrad;
-        ctx.fillRect(scanX - 35, centerY - height * 0.4, 70, height * 0.8);
-
-        // Core scanning line
-        ctx.beginPath();
-        ctx.moveTo(scanX, centerY - height * 0.35);
-        ctx.lineTo(scanX, centerY + height * 0.35);
-        ctx.strokeStyle = 'rgba(92, 240, 255, 0.9)';
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = 'rgba(92, 240, 255, 0.9)';
-        ctx.shadowBlur = 15;
-        ctx.stroke();
-        ctx.shadowBlur = 0; // reset
-
-        // 3. Draw radar scanning circles on the sweeping line
-        const radarY = centerY + Math.sin(time * 0.05) * (height * 0.25);
-        ctx.beginPath();
-        ctx.arc(scanX, radarY, 40, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(92, 240, 255, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(scanX, radarY, 15, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(92, 240, 255, 0.3)';
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.arc(scanX, radarY, 6, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(92, 240, 255, 0.95)';
-        ctx.fill();
-
-        // 4. Draw horizontal scanning grid line
-        const gridY = centerY + Math.cos(time * 0.015) * (height * 0.3);
-        ctx.beginPath();
-        ctx.moveTo(centerX - scanWidth * 0.5, gridY);
-        ctx.lineTo(centerX + scanWidth * 0.5, gridY);
-        ctx.strokeStyle = 'rgba(176, 122, 255, 0.35)';
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
-      } else {
-        ctx.clearRect(0, 0, width, height);
+      ctx.clearRect(0, 0, width, height);
         
         // Draw static drifting stars first (background layer)
         stars.forEach(s => {
@@ -776,7 +702,6 @@ export default function App() {
         // 5. Bumi & Bulan (Earth & Moon)
         const earthPos = getWarpPos(width * 0.78, height * 0.20);
         drawEarth(earthPos.x, earthPos.y);
-      }
 
       animId = requestAnimationFrame(draw);
     }
