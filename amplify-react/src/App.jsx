@@ -867,8 +867,8 @@ export default function App() {
         result = {
           title: generateTitle(prefixes, suffixes),
           tagline: getRandom(taglines),
-          theme: "konghucu",
-          bgClass: "bg-konghucu-1",
+          theme: "ips",
+          bgClass: "bg-ips-3",
           stamp: true
         };
       }
