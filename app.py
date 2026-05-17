@@ -5,7 +5,7 @@ import g4f
 import io
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, ProfileNotFound
 from PIL import Image
@@ -127,7 +127,7 @@ def decode_image(data):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return send_file('index.html')
 
 
 @app.route('/api/login', methods=['POST'])
