@@ -1398,7 +1398,7 @@ export default function App() {
     setEditCustomTagline(s.customTagline || '');
     const initialGrades = {};
     SUBJECTS.forEach(sub => {
-      initialGrades[sub.key] = s.grades && s.grades[sub.key] !== undefined ? s.grades[sub.key] : 80;
+      initialGrades[sub.key] = s.grades && s.grades[sub.key] !== undefined ? s.grades[sub.key] : '';
     });
     setEditGrades(initialGrades);
   };
@@ -1408,7 +1408,16 @@ export default function App() {
 
     try {
       let s = { ...editingStudent };
-      s.grades = { ...editGrades };
+      
+      // Filter out any empty grades, saving only valid numeric ones
+      const cleanedGrades = {};
+      Object.entries(editGrades).forEach(([key, val]) => {
+        if (val !== '' && val !== undefined && val !== null) {
+          cleanedGrades[key] = parseFloat(val);
+        }
+      });
+      s.grades = cleanedGrades;
+      
       s.customTitle = editCustomTitle.trim();
       s.customTagline = editCustomTagline.trim();
 
@@ -2632,7 +2641,7 @@ export default function App() {
                 <div className="subj-card" key={sub.key}>
                   <div className="ico">{sub.icon}</div>
                   <label>{sub.name}</label>
-                  <input type="number" value={editGrades[sub.key] || 80} onChange={(e) => setEditGrades({ ...editGrades, [sub.key]: parseFloat(e.target.value) || 0 })} min="0" max="100" />
+                  <input type="number" value={editGrades[sub.key] === undefined || editGrades[sub.key] === '' ? '' : editGrades[sub.key]} onChange={(e) => { const v = e.target.value; setEditGrades({ ...editGrades, [sub.key]: v === '' ? '' : parseFloat(v) }); }} placeholder="—" min="0" max="100" />
                 </div>
               ))}
             </div>
