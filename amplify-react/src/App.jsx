@@ -1239,7 +1239,7 @@ export default function App() {
                             <h4>⚠️ Catatan Kasus Sekolah:</h4>
                             <ul>
                               {matchedStudent.violations_history.map((v, i) => (
-                                <li key={i}><strong>{v.date.substring(0, 10)}</strong>: {v.note}</li>
+                                <li key={i}><strong>{(v.date || '').substring(0, 10) || '—'}</strong>: {v.note}</li>
                               ))}
                             </ul>
                           </div>
@@ -1276,7 +1276,7 @@ export default function App() {
                                   ) : (
                                     history.slice(-3).reverse().map((h, hi) => (
                                       <div key={hi}>
-                                        <span>{h.date.substring(5, 10)}</span>
+                                        <span>{(h.date || '').substring(5, 10) || '—'}</span>
                                         <strong>{h.val}</strong>
                                       </div>
                                     ))
