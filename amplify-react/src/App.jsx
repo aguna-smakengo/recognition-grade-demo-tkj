@@ -2100,7 +2100,53 @@ export default function App() {
                 {qsState === 'scanner' && (
                   <div className="card" style={{ maxWidth: '600px', margin: '0 auto' }}>
                     <h3>📷 Arahkan Kamera ke Siswa</h3>
-                    <video ref={teacherVideoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '12px', marginBottom: '16px', background: '#000' }}></video>
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: '12px', marginBottom: '16px', overflow: 'hidden', background: '#080816', border: '1px solid rgba(124,106,255,0.2)', boxShadow: '0 0 30px rgba(0,0,0,0.6)' }}>
+                      {qsMsg === 'MENGANALISIS WAJAH...' && lastCapBase64 ? (
+                        <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <img src={lastCapBase64} alt="Snapshot Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          {/* Moving scanner line overlay */}
+                          <div className="hologram-scanning-line" style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            height: '3px',
+                            background: 'linear-gradient(to right, transparent, var(--cyan), transparent)',
+                            boxShadow: '0 0 12px var(--cyan), 0 0 24px var(--cyan)',
+                            animation: 'scanMove 2s ease-in-out infinite'
+                          }} />
+                          {/* Sci-fi scanner overlay grid */}
+                          <div className="scan-grid-overlay" style={{ opacity: 0.6 }} />
+                          {/* Glowing analysis circle pulse */}
+                          <div className="scanning-pulse" style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '120px',
+                            height: '120px',
+                            border: '2px dashed var(--cyan)',
+                            borderRadius: '50%',
+                            animation: 'spin 10s linear infinite',
+                            opacity: 0.5
+                          }} />
+                          {/* Biometric locked rings */}
+                          <div className="scanning-pulse-inner" style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '85px',
+                            height: '85px',
+                            border: '1px solid rgba(92,240,255,0.4)',
+                            borderRadius: '50%',
+                            boxShadow: 'inset 0 0 15px rgba(92,240,255,0.2)',
+                            opacity: 0.8
+                          }} />
+                        </div>
+                      ) : (
+                        <video ref={teacherVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}></video>
+                      )}
+                    </div>
                     <div className="btn-row" style={{ justifyContent: 'center' }}>
                       {!camRunning ? (
                         <button className="btn secondary" onClick={() => startCamera(teacherVideoRef)}>Mulai Kamera</button>
