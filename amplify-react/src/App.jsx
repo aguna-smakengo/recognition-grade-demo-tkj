@@ -5,8 +5,13 @@ import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, DeleteComm
 import * as THREE from 'three';
 
 // ── WebGL Three.js Super-Detailed Galaxy Scanner ──
-function ThreeGalaxyScanner() {
+function ThreeGalaxyScanner({ scanState }) {
   const mountRef = useRef(null);
+  const scanStateRef = useRef(scanState);
+
+  useEffect(() => {
+    scanStateRef.current = scanState;
+  }, [scanState]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -25,7 +30,7 @@ function ThreeGalaxyScanner() {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // ── Barred Spiral Galaxy Generator (35,000 Particle Physics) ──
+    // ── Ultra-Realistic Logarithmic Spiral Galaxy Physics (35,000 Particle Physics) ──
     const starCount = 35000;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(starCount * 3);
@@ -38,38 +43,75 @@ function ThreeGalaxyScanner() {
     const colorCyan = new THREE.Color('#5cf0ff');
 
     for (let i = 0; i < starCount; i++) {
-      const arm = Math.random() < 0.5 ? 0 : Math.PI;
-      const theta = Math.random() * Math.PI * 6.5;
-      
-      let r = 0;
-      if (theta < Math.PI * 1.5) {
-        r = (theta / (Math.PI * 1.5)) * 3.2;
-      } else {
-        r = 3.2 + Math.pow(theta - Math.PI * 1.5, 1.4) * 0.7;
-      }
-      
-      const spreadX = (Math.random() - 0.5) * (r * 0.22 + 0.1);
-      const spreadY = (Math.random() - 0.5) * (r * 0.12 + 0.08);
-      const spreadZ = (Math.random() - 0.5) * (r * 0.22 + 0.1);
+      let x = 0, y = 0, z = 0;
+      let dist = 0;
 
-      const x = Math.cos(theta + arm) * r + spreadX;
-      const z = Math.sin(theta + arm) * r + spreadZ;
-      const y = spreadY;
+      // Classify stars into Bulge, Central Bar, or Logarithmic Spiral Arms
+      const randType = Math.random();
+
+      if (randType < 0.25) {
+        // 1. Central Bulge (Dense glowing spherical starburst core)
+        const radius = Math.pow(Math.random(), 2.2) * 1.4;
+        const phi = Math.random() * Math.PI * 2;
+        const theta = Math.acos(Math.random() * 2 - 1);
+        
+        x = radius * Math.sin(theta) * Math.cos(phi);
+        y = radius * Math.sin(theta) * Math.sin(phi) * 0.7; // slightly flattened bulge
+        z = radius * Math.cos(theta);
+        dist = radius;
+      } 
+      else if (randType < 0.45) {
+        // 2. Galactic Central Bar (Smooth connection core-to-arms)
+        const length = (Math.random() - 0.5) * 4.0;
+        const barWidth = 0.5;
+        const spreadY = (Math.random() - 0.5) * 0.2;
+        
+        // Rotate central bar slightly for natural diagonal alignment
+        const angle = -0.4; 
+        const rawX = length;
+        const rawZ = (Math.random() - 0.5) * barWidth * (1.0 - Math.abs(length) / 2.5); // tapered ends
+        
+        x = rawX * Math.cos(angle) - rawZ * Math.sin(angle);
+        z = rawX * Math.sin(angle) + rawZ * Math.cos(angle);
+        y = spreadY;
+        dist = Math.sqrt(x*x + z*z);
+      } 
+      else {
+        // 3. Elegant Logarithmic Spiral Arms
+        const arm = Math.random() < 0.5 ? 0 : Math.PI;
+        const theta = Math.random() * Math.PI * 3.5; // winding angle
+        
+        // Logarithmic spiral math: radius grows exponentially
+        const barLength = 2.0;
+        const r = barLength + theta * 1.5; 
+        
+        // Dispersion/scatter that increases with distance for a natural gaseous look
+        const dispersion = theta * 0.28 + 0.15;
+        const spreadX = (Math.random() - 0.5) * dispersion;
+        const spreadZ = (Math.random() - 0.5) * dispersion;
+        const spreadY = (Math.random() - 0.5) * (dispersion * 0.35);
+
+        // Align starting arms with bar ends
+        const armStartAngle = -0.4;
+        x = Math.cos(theta + arm + armStartAngle) * r + spreadX;
+        z = Math.sin(theta + arm + armStartAngle) * r + spreadZ;
+        y = spreadY;
+        dist = Math.sqrt(x*x + z*z);
+      }
 
       positions[i * 3] = x;
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = z;
 
       let mixedColor = colorCore.clone();
-      const dist = Math.sqrt(x*x + z*z);
       if (dist < 1.2) {
         mixedColor.lerp(colorInner, dist / 1.2);
-      } else if (dist < 3.5) {
-        mixedColor = colorInner.clone().lerp(colorMiddle, (dist - 1.2) / 2.3);
-      } else if (dist < 7.0) {
-        mixedColor = colorMiddle.clone().lerp(colorOuter, (dist - 3.5) / 3.5);
+      } else if (dist < 3.2) {
+        mixedColor = colorInner.clone().lerp(colorMiddle, (dist - 1.2) / 2.0);
+      } else if (dist < 6.0) {
+        mixedColor = colorMiddle.clone().lerp(colorOuter, (dist - 3.2) / 2.8);
       } else {
-        mixedColor = colorOuter.clone().lerp(colorCyan, Math.min(1.0, (dist - 7.0) / 5.0));
+        mixedColor = colorOuter.clone().lerp(colorCyan, Math.min(1.0, (dist - 6.0) / 4.0));
       }
 
       colors[i * 3] = mixedColor.r;
@@ -141,8 +183,16 @@ function ThreeGalaxyScanner() {
     const laserLine = new THREE.Line(laserGeom, laserMat);
     scene.add(laserLine);
 
+    // Persistent target coordinates for the matched student star
+    const soulStarPos = new THREE.Vector3(
+      (Math.random() - 0.5) * 5,
+      (Math.random() - 0.5) * 1.2,
+      (Math.random() - 0.5) * 5
+    );
+
     let clock = new THREE.Clock();
     let animId;
+    const curLook = new THREE.Vector3(0, 0, 0);
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -151,16 +201,43 @@ function ThreeGalaxyScanner() {
       // Galaxy spin speed
       galaxyPoints.rotation.y = elapsedTime * 0.1;
 
-      // Vertical sweeping horizontal translation (left to right scanning)
-      const sweep = Math.sin(elapsedTime * 1.5) * 7.5;
-      scanPlane.position.x = sweep;
-      scanGrid.position.x = sweep;
-      laserLine.position.x = sweep;
+      if (scanStateRef.current === 'zooming') {
+        // Smoothly plunge/zoom camera directly into the coordinates of the selected star!
+        camera.position.lerp(new THREE.Vector3(soulStarPos.x, soulStarPos.y + 0.25, soulStarPos.z + 0.95), 0.075);
+        curLook.lerp(soulStarPos, 0.075);
+        camera.lookAt(curLook);
 
-      // Sweeping camera orbit rotation
-      camera.position.x = Math.sin(elapsedTime * 0.2) * 5;
-      camera.position.z = 15 + Math.cos(elapsedTime * 0.2) * 3;
-      camera.lookAt(0, 0, 0);
+        // Dynamically accelerate particle size and glow to create a gorgeous warp jump effect!
+        material.size = 0.14 + (Math.sin(elapsedTime * 15) * 0.04) + 0.12 * Math.min(1.0, elapsedTime * 0.5);
+
+        // Lock scanning beams onto the target coordinate!
+        scanPlane.position.lerp(soulStarPos, 0.075);
+        scanGrid.position.lerp(soulStarPos, 0.075);
+        laserLine.position.lerp(soulStarPos, 0.075);
+      } else {
+        // Normal scanning translation (left to right scanning)
+        const sweep = Math.sin(elapsedTime * 1.5) * 7.5;
+        scanPlane.position.x = sweep;
+        scanPlane.position.y = 0;
+        scanPlane.position.z = 0;
+
+        scanGrid.position.x = sweep;
+        scanGrid.position.y = 0;
+        scanGrid.position.z = 0;
+
+        laserLine.position.x = sweep;
+        laserLine.position.y = 0;
+        laserLine.position.z = 0;
+
+        // Reset particle size
+        material.size = 0.14;
+
+        // Normal orbit sweeping camera rotation
+        const targetCamX = Math.sin(elapsedTime * 0.2) * 5;
+        const targetCamZ = 15 + Math.cos(elapsedTime * 0.2) * 3;
+        camera.position.lerp(new THREE.Vector3(targetCamX, 10, targetCamZ), 0.05);
+        camera.lookAt(0, 0, 0);
+      }
 
       renderer.render(scene, camera);
     };
@@ -1282,6 +1359,8 @@ export default function App() {
   };
 
   const processStudentFace = async (base64) => {
+    setLastCapBase64(base64); // Set source target photo instantly so the biometric corner box shows it!
+
     if (!rekClient || !dbClient) {
       triggerToast('AWS Credentials are not configured!', 'fail');
       setScanState('scan');
@@ -1340,33 +1419,45 @@ export default function App() {
               }));
 
               if (dbData.Item) {
+                // Set result and initiate 3D zoom lock-on state
+                setMatchedStudent(dbData.Item);
+                setMatchedPhoto(base64);
+                setScanState('zooming');
                 document.body.classList.add('warp-jump');
+                
                 setTimeout(() => {
-                  setMatchedStudent(dbData.Item);
-                  setMatchedPhoto(base64);
                   setScanState('result-ok');
                   document.body.classList.remove('warp-jump');
-                }, 1000);
+                }, 2200); // Epic 2.2s zoom pan lock-on sequence
               } else {
+                setMatchedPhoto(base64);
+                setScanState('zooming');
                 document.body.classList.add('warp-jump');
+                
                 setTimeout(() => {
                   showUnknownResult(base64, detected);
                   document.body.classList.remove('warp-jump');
-                }, 1000);
+                }, 2200);
               }
             } catch (dbErr) {
+              setMatchedPhoto(base64);
+              setScanState('zooming');
               document.body.classList.add('warp-jump');
+              
               setTimeout(() => {
                 showUnknownResult(base64, detected);
                 document.body.classList.remove('warp-jump');
-              }, 1000);
+              }, 2200);
             }
           } else {
+            setMatchedPhoto(base64);
+            setScanState('zooming');
             document.body.classList.add('warp-jump');
+            
             setTimeout(() => {
               showUnknownResult(base64, detected);
               document.body.classList.remove('warp-jump');
-            }, 1000);
+            }, 2200);
           }
         });
       });
@@ -2121,10 +2212,10 @@ export default function App() {
             )}
 
             {/* 2. Loading Recognition */}
-            {scanState === 'loading' && (
+            {(scanState === 'loading' || scanState === 'zooming') && (
               <div className="scan-loader-galactic">
                 {/* 3D WebGL rotating particle galaxy */}
-                <ThreeGalaxyScanner />
+                <ThreeGalaxyScanner scanState={scanState} />
 
                 {/* Floating Corner Face Biometric Scan Panel */}
                 <div className="biometric-corner-box">
@@ -2140,8 +2231,12 @@ export default function App() {
                   </div>
                   <div className="corner-metrics font-mono">
                     <div className="status-title">FACE ID: LOCALLY ENROLLED</div>
-                    <div className="status-sub text-cyan animate-flicker">SCANNING VECTOR MATRIX...</div>
-                    <div className="status-detail text-purple">128-D EMBEDDING LOCKED</div>
+                    <div className="status-sub text-cyan animate-flicker">
+                      {scanState === 'zooming' ? '🎯 TARGET IDENTIFIED!' : 'SCANNING VECTOR MATRIX...'}
+                    </div>
+                    <div className="status-detail text-purple">
+                      {scanState === 'zooming' ? '🔐 PROFILE DECRYPTED' : '128-D EMBEDDING LOCKED'}
+                    </div>
                   </div>
                 </div>
 
@@ -2156,13 +2251,23 @@ export default function App() {
                       <div className="log-line text-cyan font-mono animate-flicker">🚀 COGNITIVE SCAN INITIALIZED...</div>
                       <div className="log-line text-purple font-mono delay-1">🔍 LOCKING ON CELESTIAL TARGET COORDINATES</div>
                       <div className="log-line text-green font-mono delay-2">🛰️ CROSS-REFERENCING BIMA SAKTI DATABASES</div>
-                      <div className="log-line text-yellow font-mono delay-3">🌀 EXTRACTING SOUL PROFILE FROM ANDROMEDA ARCHIVES</div>
+                      <div className="log-line text-yellow font-mono delay-3">
+                        {scanState === 'zooming' 
+                          ? '🎯 CONVERGING SENSORS ON IDENTIFIED TARGET STAR!' 
+                          : '🌀 EXTRACTING SOUL PROFILE FROM ANDROMEDA ARCHIVES'}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <h2 className="ai-loading-pulse mt">MENCARI PROFIL JIWA DI ALAM SEMESTA...</h2>
-                <p className="ai-loading-pulse-slow">Scanning 35,000 stars dynamically for matching signatures</p>
+                <h2 className="ai-loading-pulse mt">
+                  {scanState === 'zooming' ? '🎯 PROFIL DITEMUKAN! LOCKING ON COORDINATES...' : 'MENCARI PROFIL JIWA DI ALAM SEMESTA...'}
+                </h2>
+                <p className="ai-loading-pulse-slow">
+                  {scanState === 'zooming' 
+                    ? 'Hyperspace jump deep into coordinates of matched student star...' 
+                    : 'Scanning 35,000 stars dynamically for matching signatures'}
+                </p>
               </div>
             )}
 
