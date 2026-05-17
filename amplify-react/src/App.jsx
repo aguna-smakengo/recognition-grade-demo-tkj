@@ -20,7 +20,6 @@ export default function App() {
   // Navigation & UI States
   const [screen, setScreen] = useState('splash');
   const [teacherTab, setTeacherTab] = useState('t-reg');
-  const [showConfig, setShowConfig] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
@@ -103,25 +102,11 @@ export default function App() {
 
   // ── Load AWS config on mount ──
   useEffect(() => {
-    // 1. Prioritize Environment Variables from Amplify Console (VITE_ prefix)
-    const envKey = import.meta.env.VITE_AWS_ACCESS_KEY_ID;
-    const envSecret = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
-    const envToken = import.meta.env.VITE_AWS_SESSION_TOKEN;
-    const envTable = import.meta.env.VITE_DYNAMODB_TABLE;
-    const envCol = import.meta.env.VITE_REKOGNITION_COLLECTION;
-
-    // 2. Fallback to LocalStorage for manual overrides
-    const localKey = localStorage.getItem('fg_aws_key');
-    const localSecret = localStorage.getItem('fg_aws_secret');
-    const localToken = localStorage.getItem('fg_aws_token');
-    const localTable = localStorage.getItem('fg_aws_table');
-    const localCol = localStorage.getItem('fg_aws_collection');
-
-    const key = localKey || envKey || '';
-    const secret = localSecret || envSecret || '';
-    const token = localToken || envToken || '';
-    const table = localTable || envTable || 'StudentGrades';
-    const collection = localCol || envCol || 'student-faces';
+    const key = import.meta.env.VITE_AWS_ACCESS_KEY_ID || '';
+    const secret = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY || '';
+    const token = import.meta.env.VITE_AWS_SESSION_TOKEN || '';
+    const table = import.meta.env.VITE_DYNAMODB_TABLE || 'StudentGrades';
+    const collection = import.meta.env.VITE_REKOGNITION_COLLECTION || 'student-faces';
 
     setCfgKey(key);
     setCfgSecret(secret);
@@ -143,13 +128,13 @@ export default function App() {
 
         setRekClient(rek);
         setDbClient(docDb);
-        triggerToast('AWS SDK V3 successfully configured!', 'ok');
+        triggerToast('AWS SDK V3 successfully configured from Console!', 'ok');
       } catch (err) {
         console.error(err);
         triggerToast('Initialization failure: ' + err.message, 'fail');
       }
     } else {
-      triggerToast('AWS credentials missing! Open config⚙️', 'fail');
+      triggerToast('AWS credentials missing in Console!', 'fail');
     }
   }, []);
 
@@ -222,34 +207,6 @@ export default function App() {
     };
   }, []);
 
-  // ── Save Admin Config ──
-  const saveConfig = () => {
-    if (!cfgKey || !cfgSecret) {
-      triggerToast('AWS Access Key ID and Secret Access Key are required!', 'fail');
-      return;
-    }
-
-    localStorage.setItem('fg_aws_key', cfgKey.trim());
-    localStorage.setItem('fg_aws_secret', cfgSecret.trim());
-    localStorage.setItem('fg_aws_token', cfgToken.trim());
-    localStorage.setItem('fg_aws_table', cfgTable.trim());
-    localStorage.setItem('fg_aws_collection', cfgCollection.trim());
-
-    const credentials = {
-      accessKeyId: cfgKey.trim(),
-      secretAccessKey: cfgSecret.trim(),
-      sessionToken: cfgToken.trim() || undefined
-    };
-
-    const rek = new Rekognition({ region: 'us-east-1', credentials });
-    const rawDb = new DynamoDB({ region: 'us-east-1', credentials });
-    const docDb = DynamoDBDocumentClient.from(rawDb);
-
-    setRekClient(rek);
-    setDbClient(docDb);
-    setShowConfig(false);
-    triggerToast('Configuration saved successfully!', 'ok');
-  };
 
   // ── Start Camera WebRTC ──
   const startCamera = async (targetRef) => {
@@ -925,8 +882,6 @@ export default function App() {
       </div>
       <div className="galaxy"></div>
 
-      {/* Floating Gear Admin Config */}
-      <button className="admin-gear" onClick={() => setShowConfig(true)} title="AWS Credentials Settings">⚙️</button>
 
       {/* ═══ SPLASH SCREEN ═══ */}
       {screen === 'splash' && (
@@ -1347,39 +1302,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ═══ ADMIN CONFIG MODAL ═══ */}
-      {showConfig && (
-        <div className="modal-bg">
-          <div className="modal" style={{ maxWidth: '600px' }}>
-            <button className="close-x" onClick={() => setShowConfig(false)}>×</button>
-            <h2>⚙️ AWS Cloud Credentials Config</h2>
-            <p style={{ color: 'var(--text3)', fontSize: '0.9rem', marginTop: '-10px', marginBottom: '20px' }}>
-              Bisa langsung disave di <strong>Amplify Console</strong> sebagai Env Var atau paste manual di bawah ini.
-            </p>
-            <div className="field">
-              <label>AWS Access Key ID</label>
-              <input value={cfgKey} onChange={(e) => setCfgKey(e.target.value)} type="text" placeholder="ASIA..." />
-            </div>
-            <div className="field">
-              <label>AWS Secret Access Key</label>
-              <input value={cfgSecret} onChange={(e) => setCfgSecret(e.target.value)} type="password" placeholder="wJalrXUtnFEMI/K7MD..." />
-            </div>
-            <div className="field">
-              <label>AWS Session Token (LabRole)</label>
-              <textarea value={cfgToken} onChange={(e) => setCfgToken(e.target.value)} rows="4" placeholder="IQoJb3JpZ2luX2VjEBYaCXVzLWVhc3QtMS..."></textarea>
-            </div>
-            <div className="field">
-              <label>DynamoDB Table Name</label>
-              <input value={cfgTable} onChange={(e) => setCfgTable(e.target.value)} type="text" />
-            </div>
-            <div className="field">
-              <label>Rekognition Collection ID</label>
-              <input value={cfgCollection} onChange={(e) => setCfgCollection(e.target.value)} type="text" />
-            </div>
-            <button className="btn primary full mt lg" onClick={saveConfig}>💾 Simpan Konfigurasi</button>
-          </div>
-        </div>
-      )}
 
       {/* ═══ LOGIN MODAL ═══ */}
       {showLogin && (
