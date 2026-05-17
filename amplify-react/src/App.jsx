@@ -1266,38 +1266,36 @@ export default function App() {
       <div className="celestial-universe">
         {/* Matahari (Sun) */}
         <div className="celestial-body sun-system" style={{ top: '12%', left: '8%' }}>
-          <div className="sun-corona"></div>
-          <div className="sun-sphere"></div>
+          <div className="sun-glow-overlay"></div>
+          <img src="/sun_realistic.png" className="celestial-img sun-img" alt="Sun" />
           <div className="celestial-label">Matahari (Solar Core)</div>
         </div>
 
         {/* Galaksi Bima Sakti (Milky Way) */}
         <div className="celestial-body bima-sakti" style={{ top: '48%', left: '78%' }}>
-          <div className="galaxy-core"></div>
-          <div className="galaxy-arms"></div>
+          <img src="/milkyway_realistic.png" className="celestial-img milkyway-img" alt="Milky Way" />
           <div className="celestial-label">Galaksi Bima Sakti</div>
         </div>
 
         {/* Galaksi Andromeda */}
         <div className="celestial-body andromeda-galaxy" style={{ top: '76%', left: '12%' }}>
-          <div className="andromeda-core"></div>
-          <div className="andromeda-spiral"></div>
+          <img src="/andromeda_realistic.png" className="celestial-img andromeda-img" alt="Andromeda" />
           <div className="celestial-label">Galaksi Andromeda</div>
         </div>
 
         {/* Saturnus dengan Cincin Indah */}
         <div className="celestial-body saturn-system" style={{ top: '68%', right: '14%' }}>
-          <div className="saturn-back-ring"></div>
-          <div className="saturn-sphere"></div>
-          <div className="saturn-front-ring"></div>
+          <img src="/saturn_realistic.png" className="celestial-img saturn-img" alt="Saturn" />
           <div className="celestial-label">Planet Saturnus</div>
         </div>
 
         {/* Bumi & Orbit Bulan */}
         <div className="celestial-body earth-system" style={{ top: '22%', right: '22%' }}>
-          <div className="earth-sphere"></div>
-          <div className="moon-orbit">
-            <div className="moon-sphere"></div>
+          <div className="earth-orbit-wrapper">
+            <img src="/earth_realistic.png" className="celestial-img earth-img" alt="Earth" />
+            <div className="moon-orbit">
+              <div className="moon-sphere"></div>
+            </div>
           </div>
           <div className="celestial-label">Bumi & Bulan</div>
         </div>
