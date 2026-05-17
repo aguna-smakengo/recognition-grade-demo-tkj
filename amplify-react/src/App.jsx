@@ -30,8 +30,8 @@ function ThreeGalaxyScanner({ scanState }) {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // ── Ultra-Realistic Logarithmic Spiral Galaxy Physics (35,000 Particle Physics) ──
-    const starCount = 35000;
+    // ── Ultra-Realistic Logarithmic Spiral Galaxy Physics (45,000 Particle Physics) ──
+    const starCount = 45000;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(starCount * 3);
     const colors = new Float32Array(starCount * 3);
@@ -147,6 +147,96 @@ function ThreeGalaxyScanner({ scanState }) {
     const galaxyPoints = new THREE.Points(geometry, material);
     scene.add(galaxyPoints);
 
+
+    // ── Gaseous Nebula Cloud Generator (6,000 Cosmic Gas Particles) ──
+    const nebCount = 6000;
+    const nebGeometry = new THREE.BufferGeometry();
+    const nebPositions = new Float32Array(nebCount * 3);
+    const nebColors = new Float32Array(nebCount * 3);
+
+    for (let i = 0; i < nebCount; i++) {
+      let x = 0, y = 0, z = 0;
+      let dist = 0;
+      const randType = Math.random();
+
+      if (randType < 0.3) {
+        // Core bulge gas
+        const radius = Math.pow(Math.random(), 1.8) * 1.6;
+        const phi = Math.random() * Math.PI * 2;
+        const theta = Math.acos(Math.random() * 2 - 1);
+        x = radius * Math.sin(theta) * Math.cos(phi);
+        y = radius * Math.sin(theta) * Math.sin(phi) * 0.6;
+        z = radius * Math.cos(theta);
+        dist = radius;
+      } else {
+        // Arm gas clouds
+        const arm = Math.random() < 0.5 ? 0 : Math.PI;
+        const theta = Math.random() * Math.PI * 3.2;
+        const barLength = 1.8;
+        const r = barLength + theta * 1.4;
+        
+        // Gas has even wider dispersion than stars
+        const dispersion = theta * 0.42 + 0.3;
+        const spreadX = (Math.random() - 0.5) * dispersion;
+        const spreadZ = (Math.random() - 0.5) * dispersion;
+        const spreadY = (Math.random() - 0.5) * (dispersion * 0.4);
+
+        const armStartAngle = -0.4;
+        x = Math.cos(theta + arm + armStartAngle) * r + spreadX;
+        z = Math.sin(theta + arm + armStartAngle) * r + spreadZ;
+        y = spreadY;
+        dist = Math.sqrt(x*x + z*z);
+      }
+
+      nebPositions[i * 3] = x;
+      nebPositions[i * 3 + 1] = y;
+      nebPositions[i * 3 + 2] = z;
+
+      let mixedColor = colorCore.clone();
+      if (dist < 1.2) {
+        mixedColor.lerp(colorInner, dist / 1.2);
+      } else if (dist < 3.2) {
+        mixedColor = colorInner.clone().lerp(colorMiddle, (dist - 1.2) / 2.0);
+      } else if (dist < 6.0) {
+        mixedColor = colorMiddle.clone().lerp(colorOuter, (dist - 3.2) / 2.8);
+      } else {
+        mixedColor = colorOuter.clone().lerp(colorCyan, Math.min(1.0, (dist - 6.0) / 4.0));
+      }
+
+      nebColors[i * 3] = mixedColor.r;
+      nebColors[i * 3 + 1] = mixedColor.g;
+      nebColors[i * 3 + 2] = mixedColor.b;
+    }
+
+    nebGeometry.setAttribute('position', new THREE.BufferAttribute(nebPositions, 3));
+    nebGeometry.setAttribute('color', new THREE.BufferAttribute(nebColors, 3));
+
+    // Large diffuse texture for gas clouds
+    const gCanvas = document.createElement('canvas');
+    gCanvas.width = 64;
+    gCanvas.height = 64;
+    const gCtx = gCanvas.getContext('2d');
+    const gGrad = gCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gGrad.addColorStop(0, 'rgba(255, 255, 255, 0.16)');
+    gGrad.addColorStop(0.2, 'rgba(255, 255, 255, 0.06)');
+    gGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    gCtx.fillStyle = gGrad;
+    gCtx.fillRect(0, 0, 64, 64);
+    const nebTexture = new THREE.CanvasTexture(gCanvas);
+
+    const nebMaterial = new THREE.PointsMaterial({
+      size: 0.95,
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      map: nebTexture
+    });
+
+    const nebulaPoints = new THREE.Points(nebGeometry, nebMaterial);
+    scene.add(nebulaPoints);
+
+
     // ── Holographic Scanning Plane & Grid (WebGL) ──
     const scanPlaneGeom = new THREE.PlaneGeometry(20, 20);
     const scanPlaneMat = new THREE.MeshBasicMaterial({
@@ -199,7 +289,8 @@ function ThreeGalaxyScanner({ scanState }) {
       const elapsedTime = clock.getElapsedTime();
 
       // Galaxy spin speed
-      galaxyPoints.rotation.y = elapsedTime * 0.1;
+      galaxyPoints.rotation.y = elapsedTime * 0.08;
+      nebulaPoints.rotation.y = elapsedTime * 0.08;
 
       if (scanStateRef.current === 'zooming') {
         // Smoothly plunge/zoom camera directly into the coordinates of the selected star!
@@ -214,6 +305,18 @@ function ThreeGalaxyScanner({ scanState }) {
         scanPlane.position.lerp(soulStarPos, 0.075);
         scanGrid.position.lerp(soulStarPos, 0.075);
         laserLine.position.lerp(soulStarPos, 0.075);
+      } else if (scanStateRef.current === 'result-ok' || scanStateRef.current === 'result-no') {
+        // Slow majestic cosmic orbit camera rotating behind the transparent dashboard cards!
+        const targetCamX = Math.sin(elapsedTime * 0.04) * 11;
+        const targetCamZ = 16 + Math.cos(elapsedTime * 0.04) * 4;
+        camera.position.lerp(new THREE.Vector3(targetCamX, 9, targetCamZ), 0.025);
+        camera.lookAt(0, 0.4, 0);
+        
+        // Hide the sweeping scanning beams when not scanning!
+        scanPlane.position.set(0, -999, 0);
+        scanGrid.position.set(0, -999, 0);
+        laserLine.position.set(0, -999, 0);
+        material.size = 0.13;
       } else {
         // Normal scanning translation (left to right scanning)
         const sweep = Math.sin(elapsedTime * 1.5) * 7.5;
@@ -291,6 +394,7 @@ const SUBJECTS = [
 export default function App() {
   // Navigation & UI States
   const [screen, setScreen] = useState('splash');
+  const [showWarpFlash, setShowWarpFlash] = useState(false);
   const [teacherTab, setTeacherTab] = useState('t-reg');
   const [showLogin, setShowLogin] = useState(false);
   const [loginUser, setLoginUser] = useState('');
@@ -1426,8 +1530,10 @@ export default function App() {
                 document.body.classList.add('warp-jump');
                 
                 setTimeout(() => {
+                  setShowWarpFlash(true);
                   setScanState('result-ok');
                   document.body.classList.remove('warp-jump');
+                  setTimeout(() => setShowWarpFlash(false), 1200);
                 }, 2200); // Epic 2.2s zoom pan lock-on sequence
               } else {
                 setMatchedPhoto(base64);
@@ -1435,8 +1541,10 @@ export default function App() {
                 document.body.classList.add('warp-jump');
                 
                 setTimeout(() => {
+                  setShowWarpFlash(true);
                   showUnknownResult(base64, detected);
                   document.body.classList.remove('warp-jump');
+                  setTimeout(() => setShowWarpFlash(false), 1200);
                 }, 2200);
               }
             } catch (dbErr) {
@@ -1445,8 +1553,10 @@ export default function App() {
               document.body.classList.add('warp-jump');
               
               setTimeout(() => {
+                setShowWarpFlash(true);
                 showUnknownResult(base64, detected);
                 document.body.classList.remove('warp-jump');
+                setTimeout(() => setShowWarpFlash(false), 1200);
               }, 2200);
             }
           } else {
@@ -1455,8 +1565,10 @@ export default function App() {
             document.body.classList.add('warp-jump');
             
             setTimeout(() => {
+              setShowWarpFlash(true);
               showUnknownResult(base64, detected);
               document.body.classList.remove('warp-jump');
+              setTimeout(() => setShowWarpFlash(false), 1200);
             }, 2200);
           }
         });
@@ -1932,6 +2044,9 @@ export default function App() {
       {/* Background Starry Canvas */}
       <canvas id="stars-canvas"></canvas>
       <div id="cursor-glow"></div>
+
+      {/* Cosmic Warp Speed Hyperspace transition flash overlay */}
+      {showWarpFlash && <div className="cosmic-warp-flash" />}
       
       {/* Physics-based Celestial Universe is completely simulated & drawn inside the Canvas above */}
 
@@ -2163,7 +2278,10 @@ export default function App() {
 
       {/* ═══ STUDENT SCREEN ═══ */}
       {screen === 'student' && (
-        <div className="screen active" id="student-screen">
+        <div className="screen active" id="student-screen" style={{ position: 'relative', overflow: 'hidden' }}>
+          {/* Permanent living 3D WebGL Galaxy background for the student cosmos */}
+          <ThreeGalaxyScanner scanState={scanState} />
+
           <header className="navbar student-nb">
             <div className="nb-logo" onClick={() => setScreen('splash')}>FaceGrade <span>AI</span></div>
             <button className="btn ghost sm" onClick={() => setScreen('splash')}>← Kembali</button>
@@ -2214,9 +2332,6 @@ export default function App() {
             {/* 2. Loading Recognition */}
             {(scanState === 'loading' || scanState === 'zooming') && (
               <div className="scan-loader-galactic">
-                {/* 3D WebGL rotating particle galaxy */}
-                <ThreeGalaxyScanner scanState={scanState} />
-
                 {/* Floating Corner Face Biometric Scan Panel */}
                 <div className="biometric-corner-box">
                   <div className="corner-box-title">🛰️ SOURCE TARGET DATA</div>

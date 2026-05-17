@@ -565,14 +565,14 @@ body.warp-jump #stars-canvas {
   position: fixed;
   inset: 0;
   z-index: 999;
-  background: radial-gradient(circle at center, rgba(10, 10, 28, 0.6) 0%, rgba(5, 5, 12, 0.95) 100%);
+  background: radial-gradient(circle at center, rgba(10, 10, 28, 0.1) 0%, rgba(5, 5, 12, 0.45) 100%);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
   padding-bottom: 50px;
   overflow: hidden;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(2px);
   animation: galacticFadeIn 0.6s cubic-bezier(0.19, 1, 0.22, 1) both;
 }
 
@@ -585,12 +585,30 @@ body.warp-jump #stars-canvas {
 .galaxy-3d-wrapper {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 0;
+  pointer-events: none;
 }
 .galaxy-3d-canvas {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* Blinding white cosmic hyperspace warp jump flash overlay */
+.cosmic-warp-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #ffffff;
+  pointer-events: none;
+  opacity: 0;
+  animation: cosmicWarpFlash 1.2s cubic-bezier(0.1, 0.8, 0.1, 1.0) both;
+}
+
+@keyframes cosmicWarpFlash {
+  0% { opacity: 0; }
+  15% { opacity: 1; filter: brightness(2.2) blur(0px); }
+  100% { opacity: 0; filter: brightness(1) blur(20px); }
 }
 
 /* Biometric corner panel floating in top corner */
