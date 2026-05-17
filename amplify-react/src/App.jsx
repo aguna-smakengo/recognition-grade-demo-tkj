@@ -328,11 +328,9 @@ function ThreeGalaxyScanner({ scanState, screen }) {
         // Reset particle size
         material.size = 0.14;
 
-        // Normal orbit sweeping camera rotation
-        const targetCamX = Math.sin(elapsedTime * 0.2) * 5;
-        const targetCamZ = 15 + Math.cos(elapsedTime * 0.2) * 3;
-        camera.position.lerp(new THREE.Vector3(targetCamX, 10, targetCamZ), 0.05);
-        camera.lookAt(0, 0, 0);
+        // Stable symmetrical frontal scanning camera view (perfectly aligned with the scanning HUD)
+        camera.position.lerp(new THREE.Vector3(0, 3.2, 14.5), 0.05);
+        camera.lookAt(0, 0.4, 0);
       } else {
         // Completely HIDE scanning grids, sweeping beams and lasers during camera live preview ('scan') or dashboard results ('result-ok', 'result-no')
         scanPlane.position.set(0, -999, 0);
