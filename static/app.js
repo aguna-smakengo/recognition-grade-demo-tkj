@@ -88,7 +88,7 @@
 // Intercept fetch calls to dynamically prepend API_BASE if active
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.')
   ? ''
-  : 'https://YOUR_API_GATEWAY_URL'; // Replace this with your API Gateway endpoint!
+  : 'https://wohnyql2od.execute-api.us-east-1.amazonaws.com'; // Replace this with your API Gateway endpoint!
 
 if (API_BASE) {
   const originalFetch = window.fetch;
