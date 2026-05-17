@@ -2,6 +2,201 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Rekognition } from "@aws-sdk/client-rekognition";
 import { DynamoDB } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import * as THREE from 'three';
+
+// ── WebGL Three.js Super-Detailed Galaxy Scanner ──
+function ThreeGalaxyScanner() {
+  const mountRef = useRef(null);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+
+    const width = mountRef.current.clientWidth || window.innerWidth;
+    const height = mountRef.current.clientHeight || window.innerHeight;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x060613, 0.012);
+
+    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 100);
+    camera.position.set(0, 10, 16);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: mountRef.current, antialias: true, alpha: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // ── Barred Spiral Galaxy Generator (35,000 Particle Physics) ──
+    const starCount = 35000;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(starCount * 3);
+    const colors = new Float32Array(starCount * 3);
+
+    const colorCore = new THREE.Color('#ffffff');
+    const colorInner = new THREE.Color('#ffe17d');
+    const colorMiddle = new THREE.Color('#ff7c6a');
+    const colorOuter = new THREE.Color('#7a5cff');
+    const colorCyan = new THREE.Color('#5cf0ff');
+
+    for (let i = 0; i < starCount; i++) {
+      const arm = Math.random() < 0.5 ? 0 : Math.PI;
+      const theta = Math.random() * Math.PI * 6.5;
+      
+      let r = 0;
+      if (theta < Math.PI * 1.5) {
+        r = (theta / (Math.PI * 1.5)) * 3.2;
+      } else {
+        r = 3.2 + Math.pow(theta - Math.PI * 1.5, 1.4) * 0.7;
+      }
+      
+      const spreadX = (Math.random() - 0.5) * (r * 0.22 + 0.1);
+      const spreadY = (Math.random() - 0.5) * (r * 0.12 + 0.08);
+      const spreadZ = (Math.random() - 0.5) * (r * 0.22 + 0.1);
+
+      const x = Math.cos(theta + arm) * r + spreadX;
+      const z = Math.sin(theta + arm) * r + spreadZ;
+      const y = spreadY;
+
+      positions[i * 3] = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = z;
+
+      let mixedColor = colorCore.clone();
+      const dist = Math.sqrt(x*x + z*z);
+      if (dist < 1.2) {
+        mixedColor.lerp(colorInner, dist / 1.2);
+      } else if (dist < 3.5) {
+        mixedColor = colorInner.clone().lerp(colorMiddle, (dist - 1.2) / 2.3);
+      } else if (dist < 7.0) {
+        mixedColor = colorMiddle.clone().lerp(colorOuter, (dist - 3.5) / 3.5);
+      } else {
+        mixedColor = colorOuter.clone().lerp(colorCyan, Math.min(1.0, (dist - 7.0) / 5.0));
+      }
+
+      colors[i * 3] = mixedColor.r;
+      colors[i * 3 + 1] = mixedColor.g;
+      colors[i * 3 + 2] = mixedColor.b;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    // Programmatic glowing dot particle texture
+    const pCanvas = document.createElement('canvas');
+    pCanvas.width = 16;
+    pCanvas.height = 16;
+    const pCtx = pCanvas.getContext('2d');
+    const grad = pCtx.createRadialGradient(8, 8, 0, 8, 8, 8);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    pCtx.fillStyle = grad;
+    pCtx.fillRect(0, 0, 16, 16);
+    const texture = new THREE.CanvasTexture(pCanvas);
+
+    const material = new THREE.PointsMaterial({
+      size: 0.14,
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      map: texture
+    });
+
+    const galaxyPoints = new THREE.Points(geometry, material);
+    scene.add(galaxyPoints);
+
+    // ── Holographic Scanning Plane & Grid (WebGL) ──
+    const scanPlaneGeom = new THREE.PlaneGeometry(20, 20);
+    const scanPlaneMat = new THREE.MeshBasicMaterial({
+      color: 0x5cf0ff,
+      transparent: true,
+      opacity: 0.08,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const scanPlane = new THREE.Mesh(scanPlaneGeom, scanPlaneMat);
+    scanPlane.rotation.x = Math.PI / 2;
+    scene.add(scanPlane);
+
+    const scanGrid = new THREE.GridHelper(20, 20, 0x5cf0ff, 0x5cf0ff);
+    scanGrid.material.transparent = true;
+    scanGrid.material.opacity = 0.18;
+    scanGrid.material.depthWrite = false;
+    scene.add(scanGrid);
+
+    // Sweeping neon laser line
+    const laserGeom = new THREE.BufferGeometry();
+    const laserPos = new Float32Array([
+      -10, 0, 0,
+       10, 0, 0
+    ]);
+    laserGeom.setAttribute('position', new THREE.BufferAttribute(laserPos, 3));
+    const laserMat = new THREE.LineBasicMaterial({
+      color: 0x5cf0ff,
+      linewidth: 3,
+      transparent: true,
+      opacity: 0.9
+    });
+    const laserLine = new THREE.Line(laserGeom, laserMat);
+    scene.add(laserLine);
+
+    let clock = new THREE.Clock();
+    let animId;
+
+    const animate = () => {
+      animId = requestAnimationFrame(animate);
+      const elapsedTime = clock.getElapsedTime();
+
+      // Galaxy spin speed
+      galaxyPoints.rotation.y = elapsedTime * 0.1;
+
+      // Vertical sweeping horizontal translation (left to right scanning)
+      const sweep = Math.sin(elapsedTime * 1.5) * 7.5;
+      scanPlane.position.x = sweep;
+      scanGrid.position.x = sweep;
+      laserLine.position.x = sweep;
+
+      // Sweeping camera orbit rotation
+      camera.position.x = Math.sin(elapsedTime * 0.2) * 5;
+      camera.position.z = 15 + Math.cos(elapsedTime * 0.2) * 3;
+      camera.lookAt(0, 0, 0);
+
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      if (!mountRef.current) return;
+      const w = mountRef.current.clientWidth || window.innerWidth;
+      const h = mountRef.current.clientHeight || window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', handleResize);
+      renderer.dispose();
+      geometry.dispose();
+      material.dispose();
+      texture.dispose();
+      scanPlaneGeom.dispose();
+      scanPlaneMat.dispose();
+      laserGeom.dispose();
+      laserMat.dispose();
+    };
+  }, []);
+
+  return (
+    <div className="galaxy-3d-wrapper">
+      <canvas ref={mountRef} className="galaxy-3d-canvas" />
+    </div>
+  );
+}
 
 // Subjects Config
 const SUBJECTS = [
@@ -216,6 +411,31 @@ export default function App() {
       });
     }
 
+    // Generate super detailed central scanning galaxy particles once
+    const loadingGalaxyParticles = [];
+    const numLoadingGalaxy = 1500; // SUPER DEEP DETAIL!
+    for (let i = 0; i < numLoadingGalaxy; i++) {
+      const arm = Math.random() < 0.5 ? 0 : Math.PI;
+      const theta = Math.random() * Math.PI * 6.5; // many spiral winds
+      const r = 5 + Math.pow(theta, 1.35) * 6.0;
+      const spread = (Math.random() - 0.5) * (r * 0.22);
+      
+      const color = [
+        'rgba(176, 122, 255, 0.85)',
+        'rgba(92, 240, 255, 0.85)',
+        'rgba(255, 124, 106, 0.85)',
+        'rgba(255, 255, 255, 0.95)',
+        'rgba(124, 106, 255, 0.75)'
+      ][Math.floor(Math.random() * 5)];
+      
+      loadingGalaxyParticles.push({
+        x: Math.cos(theta + arm) * r + Math.cos(theta + Math.PI/2) * spread,
+        y: Math.sin(theta + arm) * r + Math.sin(theta + Math.PI/2) * spread,
+        size: Math.random() * 1.5 + 0.4,
+        color
+      });
+    }
+
     let time = 0;
     let warpFactor = 1.0;
     let animId;
@@ -234,36 +454,78 @@ export default function App() {
       }
 
       if (isLoading) {
-        // Dynamic motion blur trail for hyperspace speed!
-        ctx.fillStyle = 'rgba(6, 6, 19, 0.18)';
+        // Draw deep-space scanning galaxy!
+        ctx.fillStyle = 'rgba(6, 6, 19, 0.22)';
         ctx.fillRect(0, 0, width, height);
 
-        stars.forEach(s => {
-          const centerX = width / 2;
-          const centerY = height / 2;
-          
-          s.angle += 0.015; // slow galaxy spiral spin
-          s.distance += s.speed * 3.5; // push outward rapidly
-          s.r = (s.distance / (Math.max(width, height) * 0.5)) * 3.5 + 0.5; // grow bigger as they rush close
+        const centerX = width / 2;
+        const centerY = height / 2;
 
-          const targetX = centerX + Math.cos(s.angle) * s.distance;
-          const targetY = centerY + Math.sin(s.angle) * s.distance;
+        // 1. Draw 1500 particles barred spiral galaxy in the center
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(time * 0.005); // spiral rotate
+        ctx.scale(1.0, 0.45);      // tilt angle
 
-          // Draw the beautiful hyperspace star streak
+        loadingGalaxyParticles.forEach(p => {
           ctx.beginPath();
-          ctx.moveTo(centerX + Math.cos(s.angle) * (s.distance - s.speed * 6), centerY + Math.sin(s.angle) * (s.distance - s.speed * 6));
-          ctx.lineTo(targetX, targetY);
-          ctx.strokeStyle = s.color;
-          ctx.lineWidth = s.r;
-          ctx.stroke();
-
-          // Reset star if it speeds off screen
-          if (s.distance > Math.max(width, height) * 0.8) {
-            s.distance = Math.random() * 15;
-            s.angle = Math.random() * Math.PI * 2;
-            s.speed = Math.random() * 5 + 3;
-          }
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.fill();
         });
+        ctx.restore();
+
+        // 2. Draw moving search laser beam sweeping left-and-right across the entire galaxy
+        const scanWidth = width * 0.8;
+        const scanX = centerX + Math.sin(time * 0.02) * (scanWidth * 0.5);
+        
+        // Draw neon vertical scanning beam
+        const beamGrad = ctx.createLinearGradient(scanX - 35, 0, scanX + 35, 0);
+        beamGrad.addColorStop(0, 'rgba(92, 240, 255, 0)');
+        beamGrad.addColorStop(0.5, 'rgba(92, 240, 255, 0.45)');
+        beamGrad.addColorStop(1, 'rgba(92, 240, 255, 0)');
+        
+        ctx.fillStyle = beamGrad;
+        ctx.fillRect(scanX - 35, centerY - height * 0.4, 70, height * 0.8);
+
+        // Core scanning line
+        ctx.beginPath();
+        ctx.moveTo(scanX, centerY - height * 0.35);
+        ctx.lineTo(scanX, centerY + height * 0.35);
+        ctx.strokeStyle = 'rgba(92, 240, 255, 0.9)';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = 'rgba(92, 240, 255, 0.9)';
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+        ctx.shadowBlur = 0; // reset
+
+        // 3. Draw radar scanning circles on the sweeping line
+        const radarY = centerY + Math.sin(time * 0.05) * (height * 0.25);
+        ctx.beginPath();
+        ctx.arc(scanX, radarY, 40, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(92, 240, 255, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(scanX, radarY, 15, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(92, 240, 255, 0.3)';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(scanX, radarY, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(92, 240, 255, 0.95)';
+        ctx.fill();
+
+        // 4. Draw horizontal scanning grid line
+        const gridY = centerY + Math.cos(time * 0.015) * (height * 0.3);
+        ctx.beginPath();
+        ctx.moveTo(centerX - scanWidth * 0.5, gridY);
+        ctx.lineTo(centerX + scanWidth * 0.5, gridY);
+        ctx.strokeStyle = 'rgba(176, 122, 255, 0.35)';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
       } else {
         ctx.clearRect(0, 0, width, height);
         
@@ -1861,29 +2123,32 @@ export default function App() {
             {/* 2. Loading Recognition */}
             {scanState === 'loading' && (
               <div className="scan-loader-galactic">
-                {/* Overlay Sci-fi Grid */}
-                <div className="scan-grid-overlay"></div>
-                
-                <div className="scan-hud-container">
-                  {/* Glowing Target Reticle */}
-                  <div className="scan-target-box">
-                    <div className="face-scanner-bounding" style={lastCapBase64 ? { backgroundImage: `url('${lastCapBase64}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
-                      {/* Laser scanning bar */}
-                      <div className="scan-laser-bar"></div>
-                      
-                      {/* Corner Target Bracket Borders */}
+                {/* 3D WebGL rotating particle galaxy */}
+                <ThreeGalaxyScanner />
+
+                {/* Floating Corner Face Biometric Scan Panel */}
+                <div className="biometric-corner-box">
+                  <div className="corner-box-title">🛰️ SOURCE TARGET DATA</div>
+                  <div className="corner-photo-wrapper">
+                    <div className="corner-photo" style={lastCapBase64 ? { backgroundImage: `url('${lastCapBase64}')` } : {}}>
+                      <div className="corner-laser-line"></div>
                       <div className="corner-bracket tl"></div>
                       <div className="corner-bracket tr"></div>
                       <div className="corner-bracket bl"></div>
                       <div className="corner-bracket br"></div>
-                      
-                      {/* Holographic targeting ring */}
-                      <div className="holo-reticle-ring"></div>
-                      
-                      {/* Scanning lock crosshairs */}
-                      <div className="scanning-crosshair"></div>
                     </div>
                   </div>
+                  <div className="corner-metrics font-mono">
+                    <div className="status-title">FACE ID: LOCALLY ENROLLED</div>
+                    <div className="status-sub text-cyan animate-flicker">SCANNING VECTOR MATRIX...</div>
+                    <div className="status-detail text-purple">128-D EMBEDDING LOCKED</div>
+                  </div>
+                </div>
+
+                {/* Central Futuristic Holographic HUD Overlay */}
+                <div className="scan-hud-container">
+                  {/* Overlay Sci-fi Grid */}
+                  <div className="scan-grid-overlay"></div>
 
                   {/* Telemetry data display */}
                   <div className="scan-telemetry-hud">
@@ -1896,8 +2161,8 @@ export default function App() {
                   </div>
                 </div>
 
-                <h2 className="ai-loading-pulse mt">IDENTIFYING GALACTIC PROFILE...</h2>
-                <p className="ai-loading-pulse-slow">Analyzing biometric matrices with AWS Client-Side AI</p>
+                <h2 className="ai-loading-pulse mt">MENCARI PROFIL JIWA DI ALAM SEMESTA...</h2>
+                <p className="ai-loading-pulse-slow">Scanning 35,000 stars dynamically for matching signatures</p>
               </div>
             )}
 
