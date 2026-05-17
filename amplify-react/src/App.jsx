@@ -743,9 +743,84 @@ export default function App() {
     setScanState('result-no');
   };
 
+  // ── Backward Compatible Grade & History Resolvers ──
+  const getGradeValue = (student, subKey) => {
+    if (!student) return 80;
+    
+    // Direct match in grades map
+    if (student.grades && student.grades[subKey] !== undefined) {
+      return parseFloat(student.grades[subKey]);
+    }
+    
+    // Mapping of alternative keys (backward compatibility)
+    const aliases = {
+      rel: ['agama', 'religion', 'rel'],
+      ppkn: ['ppkn', 'pkn'],
+      indo: ['indo', 'bindo', 'bahasa', 'indonesia'],
+      eng: ['eng', 'inggris', 'english'],
+      math: ['math', 'matematika'],
+      ipas: ['ipas', 'science'],
+      art: ['art', 'seni', 'sbd', 'senibudaya'],
+      pe: ['pe', 'penjas', 'pjok'],
+      jawa: ['jawa']
+    };
+    
+    const possibleKeys = aliases[subKey] || [subKey];
+    if (student.grades) {
+      for (const key of possibleKeys) {
+        if (student.grades[key] !== undefined) {
+          return parseFloat(student.grades[key]);
+        }
+      }
+    }
+    
+    // Fallback: Check if there's history for this subject and take the latest value!
+    const history = getSubjectHistory(student, subKey);
+    if (history && history.length > 0) {
+      return parseFloat(history[history.length - 1].val);
+    }
+    
+    return 80;
+  };
+
+  const getSubjectHistory = (student, subKey) => {
+    if (!student || !student.grades_history) return [];
+    
+    const aliases = {
+      rel: ['rel', 'agama', 'religion'],
+      ppkn: ['ppkn', 'pkn'],
+      indo: ['indo', 'bindo', 'bahasa', 'indonesia'],
+      eng: ['eng', 'inggris', 'english'],
+      math: ['math', 'matematika'],
+      ipas: ['ipas', 'science'],
+      art: ['art', 'seni', 'sbd', 'senibudaya'],
+      pe: ['pe', 'penjas', 'pjok'],
+      jawa: ['jawa']
+    };
+    
+    let rawHistory = [];
+    const possibleKeys = aliases[subKey] || [subKey];
+    for (const key of possibleKeys) {
+      if (student.grades_history[key] && Array.isArray(student.grades_history[key])) {
+        rawHistory = student.grades_history[key];
+        break;
+      }
+    }
+    
+    // Map items so they both conform to { date, val }
+    return rawHistory.map(h => {
+      const val = h.val !== undefined ? h.val : (h.score !== undefined ? h.score : 80);
+      const date = h.date || h.timestamp || '—';
+      return { date: String(date), val: parseFloat(val) };
+    });
+  };
+
   // ── Procedural Title Generator (Ultimate Satire Edition) ──
   const getPosterMeta = (s) => {
-    const grades = s.grades || {};
+    const grades = {};
+    SUBJECTS.forEach(sub => {
+      grades[sub.key] = getGradeValue(s, sub.key);
+    });
     const vList = s.violations_history || [];
     const violations = vList.length;
     const agama = (s.agama || '').toLowerCase();
@@ -1396,7 +1471,7 @@ export default function App() {
             {scanState === 'loading' && (
               <div className="scan-loader">
                 <div className="scan-anim">
-                  <div className="scan-circle">
+                  <div className="scan-circle" style={lastCapBase64 ? { backgroundImage: `url('${lastCapBase64}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
                     <div className="scan-line"></div>
                   </div>
                   <div className="scan-dots"><span></span><span></span><span></span></div>
@@ -1409,125 +1484,129 @@ export default function App() {
             {/* 3. Matched Result */}
             {scanState === 'result-ok' && matchedStudent && (
               <div>
-                <div className="res-top-bar">
-                  <button className="btn ghost" onClick={() => { setScanState('scan'); setTimeout(() => startCamera(studentVideoRef), 100); }}>← Kembali</button>
-                  <div className="res-avg-pill">
-                    Rata-Rata: <strong>
-                      {(Object.values(matchedStudent.grades || {}).reduce((a,b)=>a+b,0) / Object.values(matchedStudent.grades || {}).length).toFixed(1)}
-                    </strong>
-                  </div>
-                </div>
-                
                 {(() => {
                   const gen = getPosterMeta(matchedStudent);
+                  const violations = matchedStudent.violations_history ? matchedStudent.violations_history.length : 0;
+                  const allGrades = SUBJECTS.map(sub => getGradeValue(matchedStudent, sub.key));
+                  const avgVal = (allGrades.reduce((a, b) => a + b, 0) / allGrades.length).toFixed(1);
+
                   return (
-                    <div className="res-layout">
-                      <div className="res-left">
-                        
-                        {/* Compact Cosmic Poster */}
-                        <div id="poster-area">
-                          <div className={`poster poster-${gen.theme} ${gen.bgClass}`}>
-                            <div className="poster-bg" style={{ backgroundImage: `url('${matchedPhoto}')` }}></div>
-                            <img className="poster-face" src={matchedPhoto} alt="Student Face" />
-                            {gen.stamp && (
-                              <div className="violation-stamp extreme">
-                                KASUS BANYAK
-                                <small>
-                                  {matchedStudent.violations_history[matchedStudent.violations_history.length - 1].note}
-                                </small>
-                              </div>
-                            )}
-                            <div className="poster-body">
-                              <div className="poster-label">{gen.title}</div>
-                              <div className="poster-sub">{matchedStudent.name} | {matchedStudent.kelas}</div>
-                              <div className="poster-tag">{gen.tagline}</div>
-                            </div>
-                            <div className="poster-deco tl">✨</div>
-                            <div className="poster-deco br">🪐</div>
-                            <div className="poster-extras">
-                              <div className="poster-extra" style={{ top: '20%', left: '10%', fontSize: '1.5rem', animationDuration: '4s' }}>⭐</div>
-                              <div className="poster-extra" style={{ top: '40%', right: '15%', fontSize: '1.8rem', animationDuration: '6s' }}>🛸</div>
-                              <div className="poster-extra" style={{ top: '70%', left: '20%', fontSize: '1.2rem', animationDuration: '5s' }}>☄️</div>
-                            </div>
-                          </div>
+                    <div>
+                      <div className="res-top-bar">
+                        <button className="btn ghost" onClick={() => { setScanState('scan'); setTimeout(() => startCamera(studentVideoRef), 100); }}>← Kembali</button>
+                        <div className="res-avg-pill">
+                          Rata-Rata: <strong>{avgVal}</strong>
                         </div>
-
-                        {/* Identity Box */}
-                        <div className="res-identity">
-                          <div className="ri-item"><span className="ri-label">NIS</span><span className="ri-val">{matchedStudent.studentId}</span></div>
-                          <div className="ri-item"><span className="ri-label">Nama</span><span className="ri-val">{matchedStudent.name}</span></div>
-                          <div className="ri-item"><span className="ri-label">Kelas</span><span className="ri-val">{matchedStudent.kelas}</span></div>
-                          <div className="ri-item"><span className="ri-label">Agama</span><span className="ri-val">{matchedStudent.agama}</span></div>
-                          <div className="ri-item"><span className="ri-label">Jumlah Kasus</span><span className="ri-val" style={{ color: matchedStudent.violations_history?.length > 0 ? 'var(--red)' : 'var(--green)' }}>{matchedStudent.violations_history?.length || 0} Kasus</span></div>
-                        </div>
-
-                        {/* Live Face Analyzer Stats */}
-                        {unknownAttrs && unknownAttrs.length > 0 && (
-                          <div className="unknown-data" style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginTop: '20px' }}>
-                            <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>🔍 Live AI Face Scan:</h4>
-                            <div className="attrs-list" style={{ gap: '8px' }}>
-                              {unknownAttrs.map((attr, i) => (
-                                <div className="attr-row" key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                  <span className="attr-label" style={{ color: 'var(--text3)' }}>{attr.label}</span>
-                                  <span className="attr-val" style={{ fontWeight: 'bold', color: 'var(--text1)' }}>{attr.val}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Violations stamp */}
-                        {matchedStudent.violations_history?.length > 0 && (
-                          <div className="violation-list-box">
-                            <h4>⚠️ Catatan Kasus Sekolah:</h4>
-                            <ul>
-                              {matchedStudent.violations_history.map((v, i) => (
-                                <li key={i}><strong>{(v.date || '').substring(0, 10) || '—'}</strong>: {v.note}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
                       </div>
 
-                      {/* Right side - grades grid */}
-                      <div className="res-right">
-                        <h3>📋 Rincian Nilai</h3>
-                        <div className="grade-tiles-compact">
-                          {SUBJECTS.map((sub, idx) => {
-                            const val = matchedStudent.grades && matchedStudent.grades[sub.key] !== undefined ? matchedStudent.grades[sub.key] : 80;
-                            let cls = 's-c';
-                            if (val >= 85) cls = 's-a';
-                            else if (val >= 75) cls = 's-b';
-                            else if (val < 60) cls = 's-d';
-
-                            const isTop = val === Math.max(...Object.values(matchedStudent.grades || {}));
-                            const history = matchedStudent.grades_history && matchedStudent.grades_history[sub.key] ? matchedStudent.grades_history[sub.key] : [];
-
-                            return (
-                              <div className={`grade-tile ${isTop ? 'crown' : ''}`} key={sub.key} style={{ animationDelay: `${idx * 0.05}s` }} onClick={() => showSubjectHistory(sub.key, sub.name)}>
-                                <div className="g-ico">{sub.icon}</div>
-                                <div className="g-name">{sub.name}</div>
-                                <div className={`g-val ${cls}`}>{val}</div>
-                                <div className="g-bar">
-                                  <div className={cls} style={{ width: `${val}%`, background: val >= 85 ? 'var(--green)' : val >= 75 ? 'var(--blue)' : 'var(--red)' }}></div>
+                      <div className="res-layout">
+                        <div className="res-left">
+                          
+                          {/* Compact Cosmic Poster */}
+                          <div id="poster-area">
+                            <div className={`poster poster-${gen.theme} ${gen.bgClass}`}>
+                              <div className="poster-bg" style={{ backgroundImage: `url('${matchedPhoto}')` }}></div>
+                              <img className="poster-face" src={matchedPhoto} alt="Student Face" />
+                              {gen.stamp && (
+                                <div className="violation-stamp extreme">
+                                  {violations >= 3 ? "KASUS BANYAK" : "ADA KASUS"}
+                                  <small>
+                                    {matchedStudent.violations_history[matchedStudent.violations_history.length - 1].note}
+                                  </small>
                                 </div>
-                                
-                                {/* Tooltip history */}
-                                <div className="g-tooltip">
-                                  {history.length === 0 ? (
-                                    <div><span>Belum ada history</span></div>
-                                  ) : (
-                                    history.slice(-3).reverse().map((h, hi) => (
-                                      <div key={hi}>
-                                        <span>{(h.date || '').substring(5, 10) || '—'}</span>
-                                        <strong>{h.val}</strong>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
+                              )}
+                              <div className="poster-body">
+                                <div className="poster-label">{gen.title}</div>
+                                <div className="poster-sub">{matchedStudent.name} | {matchedStudent.kelas}</div>
+                                <div className="poster-tag">{gen.tagline}</div>
                               </div>
-                            );
-                          })}
+                              <div className="poster-deco tl">✨</div>
+                              <div className="poster-deco br">🪐</div>
+                              <div className="poster-extras">
+                                <div className="poster-extra" style={{ top: '20%', left: '10%', fontSize: '1.5rem', animationDuration: '4s' }}>⭐</div>
+                                <div className="poster-extra" style={{ top: '40%', right: '15%', fontSize: '1.8rem', animationDuration: '6s' }}>🛸</div>
+                                <div className="poster-extra" style={{ top: '70%', left: '20%', fontSize: '1.2rem', animationDuration: '5s' }}>☄️</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Identity Box */}
+                          <div className="res-identity">
+                            <div className="ri-item"><span className="ri-label">NIS</span><span className="ri-val">{matchedStudent.studentId}</span></div>
+                            <div className="ri-item"><span className="ri-label">Nama</span><span className="ri-val">{matchedStudent.name}</span></div>
+                            <div className="ri-item"><span className="ri-label">Kelas</span><span className="ri-val">{matchedStudent.kelas}</span></div>
+                            <div className="ri-item"><span className="ri-label">Agama</span><span className="ri-val">{matchedStudent.agama}</span></div>
+                            <div className="ri-item"><span className="ri-label">Jumlah Kasus</span><span className="ri-val" style={{ color: matchedStudent.violations_history?.length > 0 ? 'var(--red)' : 'var(--green)' }}>{matchedStudent.violations_history?.length || 0} Kasus</span></div>
+                          </div>
+
+                          {/* Live Face Analyzer Stats */}
+                          {unknownAttrs && unknownAttrs.length > 0 && (
+                            <div className="unknown-data" style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', marginTop: '20px' }}>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>🔍 Live AI Face Scan:</h4>
+                              <div className="attrs-list" style={{ gap: '8px' }}>
+                                {unknownAttrs.map((attr, i) => (
+                                  <div className="attr-row" key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                    <span className="attr-label" style={{ color: 'var(--text3)' }}>{attr.label}</span>
+                                    <span className="attr-val" style={{ fontWeight: 'bold', color: 'var(--text1)' }}>{attr.val}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Violations stamp */}
+                          {matchedStudent.violations_history?.length > 0 && (
+                            <div className="violation-list-box">
+                              <h4>⚠️ Catatan Kasus Sekolah:</h4>
+                              <ul>
+                                {matchedStudent.violations_history.map((v, i) => (
+                                  <li key={i}><strong>{(v.date || '').substring(0, 10) || '—'}</strong>: {v.note}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right side - grades grid */}
+                        <div className="res-right">
+                          <h3>📋 Rincian Nilai</h3>
+                          <div className="grade-tiles-compact">
+                            {SUBJECTS.map((sub, idx) => {
+                              const val = getGradeValue(matchedStudent, sub.key);
+                              let cls = 's-c';
+                              if (val >= 85) cls = 's-a';
+                              else if (val >= 75) cls = 's-b';
+                              else if (val < 60) cls = 's-d';
+
+                              const isTop = val === Math.max(...allGrades);
+                              const history = getSubjectHistory(matchedStudent, sub.key);
+
+                              return (
+                                <div className={`grade-tile ${isTop ? 'crown' : ''}`} key={sub.key} style={{ animationDelay: `${idx * 0.05}s` }} onClick={() => showSubjectHistory(sub.key, sub.name)}>
+                                  <div className="g-ico">{sub.icon}</div>
+                                  <div className="g-name">{sub.name}</div>
+                                  <div className={`g-val ${cls}`}>{val}</div>
+                                  <div className="g-bar">
+                                    <div className={cls} style={{ width: `${val}%`, background: val >= 85 ? 'var(--green)' : val >= 75 ? 'var(--blue)' : 'var(--red)' }}></div>
+                                  </div>
+                                  
+                                  {/* Tooltip history */}
+                                  <div className="g-tooltip">
+                                    {history.length === 0 ? (
+                                      <div><span>Belum ada history</span></div>
+                                    ) : (
+                                      history.slice(-3).reverse().map((h, hi) => (
+                                        <div key={hi}>
+                                          <span>{(h.date || '').substring(5, 10) || '—'}</span>
+                                          <strong>{h.val}</strong>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     </div>
