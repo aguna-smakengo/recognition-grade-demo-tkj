@@ -1,14 +1,29 @@
 import os
 import json
 import base64
+import g4f
 import io
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from flask import Flask, render_template, request, jsonify
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, ProfileNotFound
 from PIL import Image
 
 app = Flask(__name__)
+
+def get_jakarta_time():
+    # Mengambil waktu UTC+7 (WIB / Jakarta)
+    return (datetime.now(timezone.utc) + timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
+
+def replace_decimals(obj):
+    if isinstance(obj, list):
+        return [replace_decimals(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: replace_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    return obj
 
 # ─── Configuration ───
 DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE', 'StudentGrades')
@@ -159,7 +174,10 @@ def register_student():
         table.put_item(Item={
             'studentId': sid, 'name': name, 'kelas': kelas,
             'agama': agama, 'pelanggaran': pelanggaran, 'faceId': face_id, 'thumbnail': thumb,
-            'grades': {}, 'createdAt': datetime.utcnow().isoformat()
+            'grades': {}, 
+            'grades_history': {}, 
+            'violations_history': [], 
+            'createdAt': get_jakarta_time()
         })
 
         return jsonify({'success': True, 'message': f'{name} registered successfully', 'faceId': face_id})
@@ -174,7 +192,7 @@ def register_student():
 def save_grades():
     d = request.json
     sid = d.get('studentId', '').strip()
-    grades = d.get('grades', {})
+    grades = {k: Decimal(str(v)) for k, v in d.get('grades', {}).items()}
     if not sid:
         return jsonify({'success': False, 'message': 'Student ID required'}), 400
 
@@ -194,6 +212,57 @@ def save_grades():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+@app.route('/api/add-event', methods=['POST'])
+def add_event():
+    d = request.json
+    sid = d.get('studentId')
+    evt_type = d.get('type') # 'grade' or 'violation'
+    
+    if not sid:
+        return jsonify({'success': False, 'message': 'Student ID required'}), 400
+        
+    try:
+        resp = table.get_item(Key={'studentId': sid})
+        if 'Item' not in resp:
+            return jsonify({'success': False, 'message': 'Student not found'}), 404
+            
+        item = resp['Item']
+        timestamp = get_jakarta_time()
+        
+        if evt_type == 'grade':
+            subj = d.get('subject')
+            score = Decimal(str(d.get('score', 0)))
+            if 'grades_history' not in item: item['grades_history'] = {}
+            if subj not in item['grades_history']:
+                item['grades_history'][subj] = []
+                if 'grades' in item and subj in item['grades']:
+                    item['grades_history'][subj].append({
+                        'score': item['grades'][subj],
+                        'timestamp': item.get('createdAt', timestamp)
+                    })
+            
+            item['grades_history'][subj].append({'score': score, 'timestamp': timestamp})
+            
+            # Hitung rata-rata dan simpan di 'grades' biar gampang dibaca frontend lama
+            total = sum(e['score'] for e in item['grades_history'][subj])
+            count = len(item['grades_history'][subj])
+            if 'grades' not in item: item['grades'] = {}
+            item['grades'][subj] = Decimal(str(round(float(total) / count, 1)))
+            
+        elif evt_type == 'violation':
+            note = d.get('note')
+            if 'violations_history' not in item: item['violations_history'] = []
+            item['violations_history'].append({'note': note, 'timestamp': timestamp})
+            
+            # Update 'pelanggaran' string count untuk backwards compatibility
+            item['pelanggaran'] = ",".join([v.get('note', 'Pelanggaran') for v in item['violations_history']])
+            
+        table.put_item(Item=item)
+        return jsonify({'success': True, 'message': 'Event berhasil ditambahkan!', 'item': replace_decimals(item)})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/api/get-student/<sid>', methods=['GET'])
 def get_student(sid):
     try:
@@ -204,9 +273,102 @@ def get_student(sid):
         if 'grades' in item:
             item['grades'] = {k: float(v) for k, v in item['grades'].items()}
         item['pelanggaran'] = str(item.get('pelanggaran', ''))
-        return jsonify({'success': True, 'student': item})
+        return jsonify({'success': True, 'student': replace_decimals(item)})
     except ClientError as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/generate-ai-text', methods=['POST'])
+def generate_ai_text():
+    try:
+        data = request.json
+        student = data.get('student', {})
+        top_keys = data.get('topKeys', [])
+        top_val = data.get('topVal', 0)
+        subjects = data.get('subjects', [])
+        
+        name = student.get('name', 'Siswa')
+        kelas = student.get('kelas', 'Umum')
+        agama = student.get('agama', 'Tidak Diketahui')
+        violations_list = student.get('violations_history', [])
+        violations = len(violations_list)
+        violations_notes = ", ".join([v.get('note', 'Pelanggaran') for v in violations_list]) if violations_list else "Tidak Ada"
+        
+        # Build list of grades for prompt
+        grades_str = ", ".join([f"{s.get('name')}: {s.get('val')}" for s in subjects])
+        top_subjects_str = ", ".join([s.get('name', '') for s in subjects if s.get('key') in top_keys])
+        
+        prompt = f"""
+        Kamu adalah AI Kios FaceGrade yang bertugas membuat julukan (title) dan tagline (kata-kata mutiara/lucu) untuk poster siswa berdasarkan prestasi akademis, agama, dan catatan pelanggaran di sekolah.
+        
+        Data Siswa:
+        - Nama: {name}
+        - Kelas: {kelas}
+        - Agama: {agama}
+        - Jumlah Pelanggaran: {violations}
+        - Detail Catatan Pelanggaran: {violations_notes}
+        - Nilai Semua Mapel: {grades_str}
+        - Mapel Paling Unggul (Nilai {top_val}): {top_subjects_str}
+        
+        Tugas Anda:
+        Buatlah 1 Julukan (title) dan 1 Tagline (kata-kata mutiara/quotes) yang lucu, kocak, seru, dan sangat sesuai dengan Julukan tersebut.
+        
+        ATURAN UTAMA - KASUS PELANGGARAN & NILAI RATA-RATA:
+        - JIKA SISWA MEMILIKI CATATAN PELANGGARAN (tidak kosong/tidak 'Tidak Ada') DAN nilainya biasa saja (rata-rata 70-85), Anda WAJIB membuat Julukan dan Tagline berdasarkan pelanggaran tersebut, bukan nilai akademisnya!
+          Contoh:
+          * Pelanggaran: 'Tidur di kelas' -> Julukan: "Calon Menteri" atau "Bupati Turu" atau "Raja Turu". Tagline: "Latihan simulasi tidur pas rapat paripurna DPR di masa depan." (Sangat Lucu!)
+          * Pelanggaran: 'Main mobile legends saat guru menerangkan' -> Julukan: "Atlet Mabar" atau "Pro Player". Tagline: "Pecah rank Mythic lebih penting daripada memikirkan nasib bangsa."
+          * Pelanggaran: 'Terlambat masuk sekolah' -> Julukan: "Pawang Gerbang" atau "Raja Telat". Tagline: "Datang jam 8 biar gerbang sekolah serasa gerbang istana pribadi."
+          * Pelanggaran: 'Uang kas kelas nunggak / uang kas hilang' -> Julukan: "Calon Koruptor" atau "Menteri Keuangan". Tagline: "Latihan korupsi uang kas kelas demi membiayai seblak pacar tercinta."
+          * Pelanggaran: 'Suka bolos ke kantin' -> Julukan: "Camat Kantin" atau "Gubernur Lapar". Tagline: "Rapat paripurna di meja kantin membahas subsidi gorengan gratis."
+        
+        ATURAN KHUSUS - BULE JAWA:
+        Jika nilai English (Bahasa Inggris) DAN Bahasa Jawa sama-sama tinggi/unggul (di atas 85), berikan Julukan (title): "Bule Jawa" (HARUS PERSIS INI).
+        Dan buatlah Tagline campuran Bahasa Inggris dan Jawa medok yang super kocak (contoh: "Which is kulo niku saestu bingung jal!", "I am sorry ndak sengaja jal!", "Hello guys, monggo pinarak yo!").
+        
+        ATURAN UMUM JULUKAN (TITLE):
+        - Julukan (title) HARUS TEPAT 2 KATA! (Contoh: "Calon Presiden", "Calon Menteri", "Calon Koruptor", "Capres Kantin", "Ustadz Gaul", "Romo Santuy", "Pendeta Digital", "Junzi Modern", "Bupati Turu", "Camat Kantin"). Jangan lebih atau kurang dari 2 kata!
+        - BOLEH gunakan kata keagamaan yang akrab seperti 'Ustadz', 'Romo', 'Pendeta', 'Junzi' jika nilai Agama mereka sangat tinggi (misal: 'Ustadz Gaul', 'Romo Santuy', 'Pendeta Digital', 'Junzi Modern'). Jangan buat kombinasi anomali seperti 'Ustadz Digital' yang aneh. HINDARI kata kuno/kaku seperti 'Saint' atau 'Ksatria'.
+        - Julukan harus sangat kreatif, seru, menyindir secara humoris, sesuai keunggulan mapel, agama, atau catatan pelanggarannya!
+        
+        ATURAN TAGLINE:
+        - Tagline harus sangat lucu, kocak, seru, anak sekolah banget, dan mengandung sindiran politik berani yang menghibur (seperti korupsi seblak, rapat paripurna molor, visi misi kenyang bersama). Boleh agak panjang agar lucu maksimal.
+        
+        Ketentuan Output:
+        - Format respon harus berupa JSON valid seperti ini:
+        {{
+          "title": "isi_julukan_disini",
+          "tagline": "isi_tagline_disini"
+        }}
+        - JANGAN TULIS APAPUN SELAIN JSON! Jangan ada markdown ```json atau penjelasan lainnya. Hanya mentah JSON saja.
+        """
+        
+        # Call g4f
+        response = g4f.ChatCompletion.create(
+            model=g4f.models.default,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        
+        clean_resp = response.strip()
+        start_idx = clean_resp.find('{')
+        end_idx = clean_resp.rfind('}')
+        if start_idx != -1 and end_idx != -1:
+            clean_resp = clean_resp[start_idx:end_idx+1]
+            
+        res_json = json.loads(clean_resp)
+        return jsonify({
+            'success': True,
+            'title': res_json.get('title', 'Siswa Berprestasi'),
+            'tagline': res_json.get('tagline', 'Tetap santai walau nilai badai.')
+        })
+    except Exception as e:
+        print("G4F Error:", str(e))
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'title': 'Siswa Berbakat',
+            'tagline': 'Belajar terus sampai sukses.'
+        }), 200
 
 
 @app.route('/api/all-students', methods=['GET'])
@@ -218,7 +380,7 @@ def all_students():
             if 'grades' in item:
                 item['grades'] = {k: float(v) for k, v in item['grades'].items()}
             item['pelanggaran'] = str(item.get('pelanggaran', ''))
-        return jsonify({'success': True, 'students': items})
+        return jsonify({'success': True, 'students': replace_decimals(items)})
     except ClientError as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -270,7 +432,7 @@ def recognize_face():
                 try:
                     r = table.get_item(Key={'studentId': ext_id})
                     if 'Item' in r:
-                        stu = r['Item']
+                        stu = replace_decimals(r['Item'])
                         if 'grades' in stu:
                             stu['grades'] = {k: float(v) for k, v in stu['grades'].items()}
 
@@ -291,8 +453,10 @@ def recognize_face():
                                 'kelas': stu['kelas'], 'agama': stu.get('agama', ''),
                                 'pelanggaran': str(stu.get('pelanggaran', '')),
                                 'grades': stu.get('grades', {}),
+                                'grades_history': stu.get('grades_history', {}),
                                 'thumbnail': stu.get('thumbnail', ''),
-                                'similarity': sim
+                                'similarity': sim,
+                                'violations_history': stu.get('violations_history', [])
                             }
                 except Exception:
                     pass

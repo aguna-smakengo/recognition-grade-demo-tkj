@@ -2,6 +2,89 @@
    FaceGrade AI — Frontend Logic
    ═══════════════════════════════════════════════ */
 
+// ═══ COSMIC CONSTELLATION ENGINE ═══
+(function(){
+  const canvas = document.getElementById('stars-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, stars = [], constellations = [];
+  let mouseX = -500, mouseY = -500;
+  
+  function resize(){
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  
+  for(let i=0;i<200;i++){
+    stars.push({
+      x: Math.random()*W, y: Math.random()*H,
+      r: Math.random()*1.4+0.2,
+      speed: Math.random()*0.08+0.01,
+      twinkle: Math.random()*Math.PI*2,
+      twinkleSpeed: Math.random()*0.015+0.003,
+      color: ['rgba(124,106,255,','rgba(92,240,255,','rgba(176,122,255,','rgba(255,255,255,','rgba(165,148,255,'][Math.floor(Math.random()*5)]
+    });
+  }
+  
+  for(let i=0;i<stars.length;i++){
+    for(let j=i+1;j<stars.length;j++){
+      const dx=stars[i].x-stars[j].x, dy=stars[i].y-stars[j].y;
+      if(Math.sqrt(dx*dx+dy*dy)<100 && Math.random()<0.12){
+        constellations.push({a:i,b:j});
+      }
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    constellations.forEach(c=>{
+      const a=stars[c.a], b=stars[c.b];
+      const al=0.04+Math.sin(a.twinkle)*0.02;
+      ctx.strokeStyle=`rgba(124,106,255,${al})`;
+      ctx.lineWidth=0.4;
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    });
+    stars.forEach(s=>{
+      s.twinkle+=s.twinkleSpeed;
+      s.y+=s.speed;
+      if(s.y>H+5){s.y=-5;s.x=Math.random()*W;}
+      const al=0.3+Math.sin(s.twinkle)*0.5;
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=s.color+Math.max(0.1,al)+')';
+      ctx.fill();
+      // Subtle glow on bigger stars
+      if(s.r>1){
+        ctx.beginPath();
+        ctx.arc(s.x,s.y,s.r*3,0,Math.PI*2);
+        ctx.fillStyle=s.color+(al*0.1)+')';
+        ctx.fill();
+      }
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+  
+  // Smooth cursor glow
+  const glow=document.getElementById('cursor-glow');
+  if(glow){
+    let gx=-500, gy=-500;
+    document.addEventListener('mousemove',e=>{
+      mouseX=e.clientX; mouseY=e.clientY;
+      glow.classList.add('active');
+    });
+    (function moveGlow(){
+      gx+=(mouseX-gx)*0.08;
+      gy+=(mouseY-gy)*0.08;
+      glow.style.left=gx+'px';
+      glow.style.top=gy+'px';
+      requestAnimationFrame(moveGlow);
+    })();
+  }
+})();
+
 const $ = id => document.getElementById(id);
 let regStream = null, stuStream = null, regImageData = null, stuImageData = null;
 let allFaceData = null, currentFaceIdx = 0;
@@ -9,10 +92,10 @@ let allFaceData = null, currentFaceIdx = 0;
 // ── Subject config ──
 const SUBJECTS = [
   { key: 'matematika', name: 'Mathematics', icon: '📐' },
-  { key: 'ipa', name: 'Science (IPA)', icon: '🔬' },
-  { key: 'ips', name: 'Social Studies (IPS)', icon: '🌍' },
+  { key: 'ipas', name: 'IPAS', icon: '🔬' },
   { key: 'bindo', name: 'Bahasa Indonesia', icon: '📖' },
   { key: 'bing', name: 'English', icon: '🗣️' },
+  { key: 'bjawa', name: 'Bahasa Jawa', icon: '🎭' },
   { key: 'agama', name: 'Religion', icon: '🕊️' },
   { key: 'seni', name: 'Arts & Culture', icon: '🎨' },
   { key: 'penjas', name: 'Sports (PE)', icon: '⚽' },
@@ -29,21 +112,17 @@ const POSTER_VARIANTS = {
     { title:'Dewa Rumus', tagline:'Bisa nemuin X yang hilang dalam sekejap', bg:'bg-math-5', extras:['ax²+bx','x=','±','{}','≠','≤','≥','∝','⊗','⊙'] },
     { title:'Anti Remedial', tagline:'Remedial? Kata itu gak ada di kamus gue', bg:'bg-math-6', extras:['∞','λ','Σ','θ','∮','∇','n!','log','sin','cos'] },
   ],
-  ipa: [
-    { title:'Ilmuwan Edan', tagline:'Tiap hari nongkrongnya di lab sekolah', bg:'bg-ipa-1', extras:['🧬','H₂O','⚛️','NaCl','🧪','E=mc²','🔭','Fe','O₂','CO₂'] },
-    { title:'Anak Biologi', tagline:'Lebih hafal nama latin tumbuhan daripada nama tetangga', bg:'bg-ipa-2', extras:['🦠','DNA','RNA','ATP','🔬','pH','mol','Ω','μm','nm'] },
-    { title:'Pawang Kimia', tagline:'Asam basa aja paham, masa kode dari kamu engga', bg:'bg-ipa-3', extras:['🧬','🦎','🌿','🧫','🦴','🫁','🧠','🫀','🦷','🧬'] },
-    { title:'Si Paling Fisika', tagline:'Gaya gravitasi aja bisa gue lawan', bg:'bg-ipa-4', extras:['⚗️','H₂SO₄','CaCO₃','NaOH','→','Δ','mol','pH','🧪','⚛️'] },
-    { title:'Bocah Praktikum', tagline:'Pecahin gelas lab? Udah biasa bos', bg:'bg-ipa-5', extras:['F=ma','v=d/t','⚡','🌊','λ','ω','ℏ','Ψ','J','W'] },
-    { title:'Dokter Masa Depan', tagline:'Calon mantu idaman, jago bedah katak', bg:'bg-ipa-6', extras:['🌍','🔭','☀️','🌙','⭐','🪐','🌌','💫','🔬','🧲'] },
+  ipas: [
+    { title:'Ilmuwan Edan', tagline:'Tiap hari nongkrongnya di lab sekolah', bg:'bg-ipa-1', extras:['🧬','H₂O','⚛️','NaCl','🧪','E=mc²','🔬'] },
+    { title:'Anak Biologi', tagline:'Lebih hafal nama latin tumbuhan daripada nama tetangga', bg:'bg-ipa-2', extras:['🦠','DNA','RNA','ATP','🔬'] },
+    { title:'Calon Menteri', tagline:'Debat sama gue kelar hidup lu', bg:'bg-ips-4', extras:['📈','💰','📊','🏦','💱','🤝'] },
+    { title:'Si Paling Sejarah', tagline:'Cuma gue yang susah move on dari masa lalu bangsa', bg:'bg-ips-1', extras:['🏛️','📜','⚖️','🗳️','🗿'] },
+    { title:'Juragan Cuan', tagline:'Supply and demand adalah jalan ninjaku', bg:'bg-ips-6', extras:['📈','💰','📊','🏦','💱','🤝'] }
   ],
-  ips: [
-    { title:'Si Paling Sejarah', tagline:'Cuma gue yang susah move on dari masa lalu bangsa', bg:'bg-ips-1', extras:['🏛️','📜','⚖️','🗳️','🏔️','🌏','🤝','📊','🗿','🏘️'] },
-    { title:'Bocah Geografi', tagline:'Hafal peta buta tutup mata', bg:'bg-ips-2', extras:['📜','🏛️','⚔️','👑','🗡️','🏰','📖','🕰️','🗿','🏺'] },
-    { title:'Anak Sosum', tagline:'Ngegosipnya pake teori sosiologi dong', bg:'bg-ips-3', extras:['🗺️','🧭','🏔️','🌋','🏝️','🌍','🌊','🏜️','❄️','🌿'] },
-    { title:'Calon Menteri', tagline:'Debat sama gue kelar hidup lu', bg:'bg-ips-4', extras:['📈','💰','📊','🏦','💱','🤝','📉','🏭','🛒','📋'] },
-    { title:'Pawang Ekonomi', tagline:'Bakat nyari cuan udah terlihat sejak dini', bg:'bg-ips-5', extras:['🎭','🎪','🏮','🎎','🗽','🏟️','🎡','🌐','🤝','🎊'] },
-    { title:'Juragan Cuan', tagline:'Supply and demand adalah jalan ninjaku', bg:'bg-ips-6', extras:['📈','💰','📊','🏦','💱','🤝','📉','🏭','🛒','📋'] },
+  bjawa: [
+    { title:'Suhu Jawa', tagline:'Ngapunten kulo mboten saget boso alus, sagete boso tresno', bg:'bg-ips-1', extras:['🎭','📜','🪘','🌴','🏵️','🌿'] },
+    { title:'Bocah Medok', tagline:'Gak usah keminggris, mending monggo kerso wae', bg:'bg-ips-2', extras:['🎭','🌴','🏵️','🌿','🌾','✨'] },
+    { title:'Bule Jawa', tagline:'English? Yes. Jowo? Yo medok poll jal!', bg:'bg-ips-3', extras:['🇬🇧','🗣️','🎭','🌴','🏵️','🌿'] }
   ],
   bindo: [
     { title:'Anak Senja', tagline:'Ngopi sore sambil ngerangkai kata-kata galau', bg:'bg-bindo-1', extras:['📝','✒️','📚','✍️','📖','📰','🖋️','💬','📜','🎭'] },
@@ -179,8 +258,11 @@ function tab(btn) {
 }
 
 // ═══ CAMERA HELPERS ═══
-async function getCamera(videoEl) {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+let currentFacing = 'user'; // 'user' = front, 'environment' = back
+
+async function getCamera(videoEl, facing) {
+  const mode = facing || currentFacing;
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: mode } });
   videoEl.srcObject = stream;
   return stream;
 }
@@ -209,7 +291,25 @@ async function autoStartStudentCam() {
     stuStream = await getCamera($('s-vid'));
     if (ph) ph.classList.add('hidden');
   } catch (e) {
-    if (ph) { ph.innerHTML = '<span style="font-size:2rem">📷</span><p>Camera unavailable — use upload below</p>'; }
+    if (ph) { ph.innerHTML = '<span style="font-size:2rem">📷</span><p>Kamera tidak tersedia — upload foto di bawah</p>'; }
+  }
+}
+
+// ═══ FLIP CAMERA (front/back) ═══
+async function flipCamera() {
+  currentFacing = currentFacing === 'user' ? 'environment' : 'user';
+  // Detect which screen is active and restart that camera
+  const teacherActive = $('teacher-screen')?.classList.contains('active');
+  if (teacherActive) {
+    stopStream(regStream); regStream = null;
+    try {
+      regStream = await getCamera($('r-vid'));
+    } catch(e) { toast('Kamera gagal diganti', 'fail'); }
+  } else {
+    stopStream(stuStream); stuStream = null;
+    try {
+      stuStream = await getCamera($('s-vid'));
+    } catch(e) { toast('Kamera gagal diganti', 'fail'); }
   }
 }
 
@@ -225,11 +325,14 @@ function capMode(mode, btn) {
 async function startRegCam() {
   try {
     regStream = await getCamera($('r-vid'));
-    $('r-ph').classList.add('hidden');
+    const ph = $('r-ph'); if(ph) ph.classList.add('hidden');
     $('r-vid').classList.remove('hidden');
     $('btn-cam-start').classList.add('hidden');
     $('btn-cam-snap').classList.remove('hidden');
-  } catch (e) { toast('Camera access denied', 'fail'); }
+    // Show flip button on mobile
+    const flipBtn = $('btn-flip-cam');
+    if(flipBtn) flipBtn.classList.remove('hidden');
+  } catch (e) { toast('Kamera tidak bisa diakses! Pastikan pakai HTTPS.', 'fail'); }
 }
 
 function snapReg() {
@@ -261,53 +364,117 @@ function onRegFile(e) {
   reader.readAsDataURL(file);
 }
 
+// ═══ QUICK SCANNER ═══
+let qsStudentId = '';
+
+async function snapAndCheck() {
+  regImageData = captureCanvas($('r-vid'), $('r-cnv'));
+  const msgEl = $('qs-msg');
+  msgEl.classList.remove('hidden');
+  msgEl.className = 'msg-box';
+  msgEl.textContent = '🔍 Sedang scanning wajah...';
+
+  try {
+    const r = await fetch('/api/recognize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: regImageData })
+    });
+    const d = await r.json();
+    if (!d.success) { msgEl.className = 'msg-box fail'; msgEl.textContent = d.message; return; }
+
+    const faces = d.faces || [];
+    const matchedFace = faces.find(f => f.matched);
+    const matched = matchedFace ? matchedFace.student : null;
+    if (matched) {
+      qsStudentId = matched.studentId;
+      $('qs-student-name').textContent = matched.name || matched.studentId;
+      $('qs-student-class').textContent = `${matched.kelas || '-'} · NIS: ${matched.studentId}`;
+      if ($('qs-matched-img')) $('qs-matched-img').src = regImageData;
+      // Populate subject dropdown
+      const sel = $('qs-subject');
+      sel.innerHTML = SUBJECTS.map(s => `<option value="${s.key}">${s.icon} ${s.name}</option>`).join('');
+      $('qs-scanner').classList.add('hidden');
+      $('qs-add-event').classList.remove('hidden');
+      msgEl.classList.add('hidden');
+      stopStream(regStream); regStream = null;
+    } else {
+      // Not found => show register form
+      if ($('qs-unmatched-img')) $('qs-unmatched-img').src = regImageData;
+      $('qs-scanner').classList.add('hidden');
+      $('qs-register').classList.remove('hidden');
+      msgEl.classList.add('hidden');
+      stopStream(regStream); regStream = null;
+    }
+  } catch (e) { msgEl.className = 'msg-box fail'; msgEl.textContent = 'Koneksi error!'; }
+}
+
+function toggleQsEvent() {
+  const t = $('qs-event-type').value;
+  $('qs-grade-fields').classList.toggle('hidden', t !== 'grade');
+  $('qs-violation-fields').classList.toggle('hidden', t !== 'violation');
+}
+
+async function submitEvent() {
+  const t = $('qs-event-type').value;
+  let body = { studentId: qsStudentId, type: t };
+  if (t === 'grade') {
+    const score = parseFloat($('qs-score').value);
+    if (!score || score < 1 || score > 100) { toast('Nilai harus 1-100!', 'fail'); return; }
+    body.subject = $('qs-subject').value;
+    body.score = score;
+  } else {
+    const note = $('qs-note').value.trim();
+    if (!note) { toast('Tulis detail pelanggarannya!', 'fail'); return; }
+    body.note = note;
+  }
+  try {
+    const r = await fetch('/api/add-event', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+      toast(t === 'grade' ? 'Nilai berhasil disimpan! ✅' : 'Pelanggaran tercatat! ⚠️', 'ok');
+      $('qs-score').value = '';
+      $('qs-note').value = '';
+    } else { toast(d.message, 'fail'); }
+  } catch (e) { toast('Koneksi error!', 'fail'); }
+}
+
+function resetQs() {
+  $('qs-scanner').classList.remove('hidden');
+  $('qs-add-event').classList.add('hidden');
+  $('qs-register').classList.add('hidden');
+  $('qs-msg').classList.add('hidden');
+  qsStudentId = '';
+  regImageData = null;
+  startRegCam();
+}
+
 async function registerStudent() {
   const nis = $('r-nis').value.trim();
   const name = $('r-name').value.trim();
   const kelas = $('r-class').value;
   const agama = $('r-religion').value;
-  const pelanggaran = $('r-violations').value.trim();
-  const msgEl = $('reg-msg');
 
-  if (!nis) { $('r-nis').focus(); showMsg(msgEl, 'Please fill Student ID', false); return; }
-  if (!name) { $('r-name').focus(); showMsg(msgEl, 'Please fill Name', false); return; }
-  if (!kelas) { $('r-class').focus(); showMsg(msgEl, 'Please select Class', false); return; }
-  if (!agama) { $('r-religion').focus(); showMsg(msgEl, 'Please select Religion', false); return; }
-  if (!regImageData) { showMsg(msgEl, 'Please capture or upload a face photo', false); return; }
+  if (!nis) { $('r-nis').focus(); toast('Isi NIS dulu!', 'fail'); return; }
+  if (!name) { $('r-name').focus(); toast('Isi nama dulu!', 'fail'); return; }
+  if (!kelas) { $('r-class').focus(); toast('Pilih kelas!', 'fail'); return; }
+  if (!agama) { $('r-religion').focus(); toast('Pilih agama!', 'fail'); return; }
+  if (!regImageData) { toast('Foto wajah belum ada!', 'fail'); return; }
 
-  // Collect grades from inline inputs
-  const grades = {};
-  SUBJECTS.forEach(s => {
-    const inp = $(`ri-${s.key}`);
-    if (inp && inp.value !== '') grades[s.key] = parseFloat(inp.value);
-  });
-
-  showMsg(msgEl, 'Registering...', true);
   try {
-    // Step 1: Register student
     const r = await fetch('/api/register-student', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: nis, name, kelas, agama, pelanggaran, image: regImageData })
+      body: JSON.stringify({ studentId: nis, name, kelas, agama, pelanggaran: '', image: regImageData })
     });
     const d = await r.json();
-    if (!d.success) { showMsg(msgEl, d.message, false); return; }
-
-    // Step 2: Save grades if any were entered
-    if (Object.keys(grades).length > 0) {
-      await fetch('/api/save-grades', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: nis, grades })
-      });
-    }
-
-    showMsg(msgEl, d.message, true);
-    toast(`${name} registered with ${Object.keys(grades).length} grades!`, 'ok');
-    // Reset form
+    if (!d.success) { toast(d.message, 'fail'); return; }
+    toast(`${name} berhasil didaftarkan! 🎉`, 'ok');
     $('r-nis').value = ''; $('r-name').value = ''; $('r-class').value = ''; $('r-religion').value = '';
-    SUBJECTS.forEach(s => { const inp = $(`ri-${s.key}`); if (inp) inp.value = ''; });
-    regImageData = null; redoReg();
-    $('r-fprev').classList.add('hidden');
-  } catch (e) { showMsg(msgEl, 'Connection error', false); }
+    regImageData = null;
+    resetQs();
+  } catch (e) { toast('Koneksi error!', 'fail'); }
 }
 
 // ═══ TEACHER: GRADES (inline in register) ═══
@@ -589,8 +756,15 @@ function showRecognizedResult(face) {
   `;
 
   // Process Violations
-  const violationsText = s.pelanggaran || '';
-  const violationsList = violationsText ? violationsText.split(',').map(v => v.trim()).filter(v => v) : [];
+  let violationsList = [];
+  if (s.violations_history && s.violations_history.length > 0) {
+    violationsList = s.violations_history.map(v => v.note);
+  } else {
+    const violationsText = s.pelanggaran || '';
+    violationsList = violationsText ? violationsText.split(',').map(v => v.trim()).filter(v => v) : [];
+    // Handle backwards compatibility where notes were just 'x'
+    violationsList = violationsList.map(v => v === 'x' ? 'Pelanggaran tercatat (detail tidak tersedia)' : v);
+  }
 
   const vBox = $('res-violations');
   if (violationsList.length > 0) {
@@ -615,11 +789,26 @@ function showRecognizedResult(face) {
   let topKeys = entries.filter(e => e.val === topVal).map(e => e.key);
 
   // Grade tiles
+  const gradesHistory = s.grades_history || {};
   $('res-grades').innerHTML = entries.map(e => {
     const cls = e.val >= 85 ? 's-a' : e.val >= 70 ? 's-b' : e.val >= 55 ? 's-c' : 's-d';
     const crown = e.val === topVal ? 'crown' : '';
     const barColor = e.val >= 85 ? 'var(--green)' : e.val >= 70 ? 'var(--blue)' : e.val >= 55 ? 'var(--yellow)' : 'var(--red)';
+    
+    let tooltipHtml = '';
+    const hist = gradesHistory[e.key];
+    if (hist && hist.length > 0) {
+      const listItems = hist.map(h => {
+        const dateStr = h.timestamp ? h.timestamp.split(' ')[0] : '';
+        return `<div><strong>${h.score}</strong> <span style="color:var(--text3); font-size:0.7rem;">(${dateStr})</span></div>`;
+      }).join('');
+      tooltipHtml = `<div class="g-tooltip">${listItems}</div>`;
+    } else {
+      tooltipHtml = `<div class="g-tooltip"><div><strong>${e.val}</strong></div></div>`;
+    }
+
     return `<div class="grade-tile ${crown}">
+      ${tooltipHtml}
       <div class="g-ico">${e.icon}</div>
       <div class="g-name">${e.name}</div>
       <div class="g-val ${cls}">${e.val}</div>
@@ -628,10 +817,10 @@ function showRecognizedResult(face) {
   }).join('');
 
   // Generate poster
-  generatePoster(face, s, topKeys, topVal);
+  generatePoster(face, s, topKeys, topVal, entries);
 }
 
-function generatePoster(face, student, topKeys, topVal) {
+function generatePoster(face, student, topKeys, topVal, entries) {
   const area = $('poster-area');
 
   // Pool variants from ALL top subjects
@@ -645,22 +834,18 @@ function generatePoster(face, student, topKeys, topVal) {
   });
   if (variants.length === 0) variants = POSTER_VARIANTS.matematika;
 
-  // Create combination from the unified pool
-  const title = variants[Math.floor(Math.random() * variants.length)].title;
-  const tagline = variants[Math.floor(Math.random() * variants.length)].tagline;
-  const bg = variants[Math.floor(Math.random() * variants.length)].bg;
-  const extrasArr = variants[Math.floor(Math.random() * variants.length)].extras;
-
-  const cfg = { title, tagline, bg, extras: extrasArr };
+  // Create combination — pick ONE variant so title+tagline always match
+  const picked = variants[Math.floor(Math.random() * variants.length)];
+  const cfg = { title: picked.title, tagline: picked.tagline, bg: picked.bg, extras: picked.extras };
 
   // Always prefer the live face scan over the registration thumbnail
   const faceImg = generateFaceCrop(face) || (student.thumbnail ? `data:image/jpeg;base64,${student.thumbnail}` : '');
 
   let subjectNameText = '';
-  if (topKeys.length >= Math.floor(SUBJECTS.length * 0.8)) {
-    subjectNameText = 'All-Rounder Scholar';
+  if (topKeys.length === SUBJECTS.length) {
+    subjectNameText = 'Jagoan Semua Mapel';
   } else if (topKeys.length > 2) {
-    subjectNameText = `${topKeys.length} Subjects Mastered`;
+    subjectNameText = `Menguasai ${topKeys.length} Mapel`;
   } else {
     subjectNameText = topKeys.map(k => SUBJECTS.find(s => s.key === k)?.name || k).join(' & ');
   }
@@ -682,19 +867,73 @@ function generatePoster(face, student, topKeys, topVal) {
     stampHtml = `<div class="violation-stamp warning small">TERPANTAU BANDEL (${violationsCount})</div>`;
   }
 
+  const primarySubject = topKeys[0] || 'matematika';
+  const posterTheme = primarySubject === 'agama' ? `poster-${student.agama ? student.agama.toLowerCase() : 'islam'}` : `poster-${primarySubject}`;
+
   area.innerHTML = `
-    <div class="poster ${cfg.bg}">
+    <div class="poster ${cfg.bg} ${posterTheme}">
       <div class="poster-bg" style="background-image:url('${faceImg}')"></div>
       <div class="poster-extras">${extrasHtml}</div>
       <img class="poster-face" src="${faceImg}" alt="${student.name}">
       ${stampHtml}
       <div class="poster-body">
-        <div class="poster-label">${cfg.title}</div>
+        <div class="poster-label"><span class="ai-loading-pulse">⚡ MEMINDAI TAKDIR...</span></div>
         <div class="poster-sub">${student.name}</div>
-        <div class="poster-tag">${subjectNameText}: ${topVal} — "${cfg.tagline}"</div>
+        <div class="poster-tag"><span class="ai-loading-pulse-slow">🔮 AI sedang meramal takdir dan mencatat amal ibadahmu...</span></div>
       </div>
     </div>
   `;
+
+  let textUpdated = false;
+  function showFinalText(title, tagline) {
+    if (textUpdated) return;
+    textUpdated = true;
+
+    const labelEl = document.querySelector('.poster-body .poster-label');
+    if (labelEl) {
+      labelEl.style.transition = 'all 0.4s ease';
+      labelEl.style.opacity = '0';
+      setTimeout(() => {
+        labelEl.innerHTML = title;
+        labelEl.style.opacity = '1';
+      }, 400);
+    }
+    const tagEl = document.querySelector('.poster-body .poster-tag');
+    if (tagEl) {
+      tagEl.style.transition = 'all 0.4s ease';
+      tagEl.style.opacity = '0';
+      setTimeout(() => {
+        tagEl.innerHTML = `${subjectNameText}: ${topVal} — "${tagline}"`;
+        tagEl.style.opacity = '1';
+      }, 400);
+    }
+  }
+
+  // Fallback to local default if AI takes too long (e.g. 6.5s)
+  const aiTimeout = setTimeout(() => {
+    showFinalText(cfg.title, cfg.tagline);
+  }, 6500);
+
+  // Fetch AI generated text in background for real-time magic
+  fetch('/api/generate-ai-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student, topKeys, topVal, subjects: entries })
+  })
+  .then(res => res.json())
+  .then(data => {
+    clearTimeout(aiTimeout);
+    if (data.success) {
+      showFinalText(data.title, data.tagline);
+    } else {
+      showFinalText(cfg.title, cfg.tagline);
+    }
+  })
+  .catch(err => {
+    clearTimeout(aiTimeout);
+    console.error("AI Text Error:", err);
+    showFinalText(cfg.title, cfg.tagline);
+  });
 }
 
 function buildExtrasHtml(extras) {
@@ -731,14 +970,10 @@ function showUnknownResult(face) {
   $('res-no').classList.remove('hidden');
   $('res-ok').classList.add('hidden');
 
-  // Generate mystery poster with combinatorial logic
+  // Generate mystery poster — pick ONE variant
   const faceCrop = generateFaceCrop(face);
-  const title = UNKNOWN_VARIANTS[Math.floor(Math.random() * UNKNOWN_VARIANTS.length)].title;
-  const tagline = UNKNOWN_VARIANTS[Math.floor(Math.random() * UNKNOWN_VARIANTS.length)].tagline;
-  const bg = UNKNOWN_VARIANTS[Math.floor(Math.random() * UNKNOWN_VARIANTS.length)].bg;
-  const extrasArr = UNKNOWN_VARIANTS[Math.floor(Math.random() * UNKNOWN_VARIANTS.length)].extras;
-
-  const cfg = { title, tagline, bg, extras: extrasArr };
+  const picked = UNKNOWN_VARIANTS[Math.floor(Math.random() * UNKNOWN_VARIANTS.length)];
+  const cfg = { title: picked.title, tagline: picked.tagline, bg: picked.bg, extras: picked.extras };
   const extrasHtml = buildExtrasHtml(cfg.extras);
 
   const unknownPoster = document.querySelector('.unknown-visual');
@@ -750,7 +985,7 @@ function showUnknownResult(face) {
         ${faceCrop ? `<img class="poster-face" src="${faceCrop}" alt="Unknown">` : ''}
         <div class="poster-body">
           <div class="poster-label">${cfg.title}</div>
-          <div class="poster-sub">Unknown Person</div>
+          <div class="poster-sub">Wajah Tidak Dikenal</div>
           <div class="poster-tag">"${cfg.tagline}"</div>
         </div>
       </div>
