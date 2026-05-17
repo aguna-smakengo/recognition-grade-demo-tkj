@@ -6,26 +6,10 @@ provider:
   region: us-east-1
   timeout: 30
   memorySize: 512
+  role: arn:aws:iam::893411366350:role/LabRole
   environment:
     DYNAMODB_TABLE: StudentGrades
     REKOGNITION_COLLECTION: student-faces
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - dynamodb:DescribeTable
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:*:*:table/StudentGrades"
-        - Effect: Allow
-          Action:
-            - rekognition:*
-          Resource: "*"
 
 functions:
   api:
