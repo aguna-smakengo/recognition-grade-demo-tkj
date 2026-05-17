@@ -155,6 +155,7 @@ export default function App() {
   }, [scanState]);
 
   // ── Background Starry Effects ──
+  // ── Background Starry Effects & Physics-Based Celestial Bodies Simulation ──
   useEffect(() => {
     const canvas = document.getElementById('stars-canvas');
     if (!canvas) return;
@@ -179,10 +180,59 @@ export default function App() {
       });
     }
 
+    // Generate Andromeda spiral galaxy particles once
+    const andromedaParticles = [];
+    const numAndromeda = 220;
+    for (let i = 0; i < numAndromeda; i++) {
+      const arm = Math.random() < 0.5 ? 0 : Math.PI;
+      const theta = Math.random() * Math.PI * 4.5;
+      const r = 4 + Math.pow(theta, 1.45) * 3.8;
+      const spread = (Math.random() - 0.5) * (r * 0.22);
+      andromedaParticles.push({
+        theta,
+        r,
+        arm,
+        spread,
+        color: ['#b07aff', '#5cf0ff', '#ffffff', '#7c6aff'][Math.floor(Math.random() * 4)],
+        size: Math.random() * 1.4 + 0.4
+      });
+    }
+
+    // Generate Bima Sakti galaxy particles once
+    const milkyWayParticles = [];
+    const numMilkyWay = 220;
+    for (let i = 0; i < numMilkyWay; i++) {
+      const arm = Math.random() < 0.5 ? 0 : Math.PI;
+      const theta = Math.random() * Math.PI * 4.0;
+      const r = 4 + Math.pow(theta, 1.35) * 4.4;
+      const spread = (Math.random() - 0.5) * (r * 0.25);
+      milkyWayParticles.push({
+        theta,
+        r,
+        arm,
+        spread,
+        color: ['#ffd75c', '#ff7c6a', '#ffffff', '#7c6aff'][Math.floor(Math.random() * 4)],
+        size: Math.random() * 1.4 + 0.4
+      });
+    }
+
+    let time = 0;
+    let warpFactor = 1.0;
     let animId;
+
     function draw() {
       const isLoading = document.body.classList.contains('loading-scan');
+      const isWarping = document.body.classList.contains('warp-jump');
       
+      time += 1;
+      
+      // Update warp zoom physics
+      if (isWarping) {
+        warpFactor = Math.min(8.0, warpFactor + 0.12);
+      } else {
+        warpFactor = Math.max(1.0, warpFactor - 0.15);
+      }
+
       if (isLoading) {
         // Dynamic motion blur trail for hyperspace speed!
         ctx.fillStyle = 'rgba(6, 6, 19, 0.18)';
@@ -216,12 +266,14 @@ export default function App() {
         });
       } else {
         ctx.clearRect(0, 0, width, height);
+        
+        // Draw static drifting stars first (background layer)
         stars.forEach(s => {
           ctx.beginPath();
           ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
           ctx.fillStyle = s.color;
           s.d += 0.015;
-          ctx.globalAlpha = Math.abs(Math.sin(s.d));
+          ctx.globalAlpha = Math.abs(Math.sin(s.d)) * (1.0 / warpFactor); // fade out stars as we warp!
           ctx.fill();
 
           // Gentle cosmic drifting drift
@@ -230,10 +282,276 @@ export default function App() {
           if (s.x < 0 || s.x > width) s.x = Math.random() * width;
           if (s.y < 0 || s.y > height) s.y = Math.random() * height;
         });
+        
+        ctx.globalAlpha = 1.0; // reset transparency for primary celestial bodies
+
+        // Draw Celestial Bodies mathematically (under physics simulation)
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Calculate positions dynamically from viewport, scaled by warpFactor (warp zoom out)
+        const getWarpPos = (origX, origY) => {
+          return {
+            x: centerX + (origX - centerX) * warpFactor,
+            y: centerY + (origY - centerY) * warpFactor
+          };
+        };
+
+        // 1. Matahari (Solar Core)
+        const sunPos = getWarpPos(width * 0.12, height * 0.18);
+        drawSun(sunPos.x, sunPos.y);
+
+        // 2. Galaksi Bima Sakti (Milky Way)
+        const milkyPos = getWarpPos(width * 0.82, height * 0.45);
+        drawMilkyWay(milkyPos.x, milkyPos.y);
+
+        // 3. Galaksi Andromeda
+        const androPos = getWarpPos(width * 0.14, height * 0.80);
+        drawAndromeda(androPos.x, androPos.y);
+
+        // 4. Saturnus dengan 3D Rings
+        const saturnPos = getWarpPos(width * 0.88, height * 0.72);
+        drawSaturn(saturnPos.x, saturnPos.y);
+
+        // 5. Bumi & Bulan (Earth & Moon)
+        const earthPos = getWarpPos(width * 0.78, height * 0.20);
+        drawEarth(earthPos.x, earthPos.y);
       }
 
       animId = requestAnimationFrame(draw);
     }
+
+    // Mathematical drawing helpers
+    const drawSun = (x, y) => {
+      // Corona plasma spikes (animated dynamically)
+      const coronaGrad = ctx.createRadialGradient(x, y, 4, x, y, (50 + Math.sin(time * 0.06) * 6) / warpFactor);
+      coronaGrad.addColorStop(0, 'rgba(255, 235, 100, 0.95)');
+      coronaGrad.addColorStop(0.35, 'rgba(255, 120, 0, 0.45)');
+      coronaGrad.addColorStop(0.7, 'rgba(255, 50, 0, 0.18)');
+      coronaGrad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(x, y, (60 + Math.sin(time * 0.06) * 6) / warpFactor, 0, Math.PI * 2);
+      ctx.fillStyle = coronaGrad;
+      ctx.fill();
+
+      // Main core sphere
+      const coreGrad = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, 22 / warpFactor);
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.4, '#ffdd00');
+      coreGrad.addColorStop(0.85, '#ff5500');
+      coreGrad.addColorStop(1, '#cc2c00');
+      
+      ctx.beginPath();
+      ctx.arc(x, y, 22 / warpFactor, 0, Math.PI * 2);
+      ctx.fillStyle = coreGrad;
+      ctx.fill();
+
+      // Label
+      ctx.fillStyle = `rgba(155, 163, 208, ${Math.max(0, 0.7 - (warpFactor - 1) * 0.3)})`;
+      ctx.font = 'bold 9px "Sora", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('MATAHARI (SOLAR CORE)', x, y + 36 / warpFactor);
+    };
+
+    const drawEarth = (x, y) => {
+      const radius = 13 / warpFactor;
+
+      // Atmosphere Haze
+      const atmGrad = ctx.createRadialGradient(x, y, radius - 2, x, y, radius + 8);
+      atmGrad.addColorStop(0, 'rgba(94, 170, 255, 0.45)');
+      atmGrad.addColorStop(1, 'rgba(94, 170, 255, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(x, y, radius + 8, 0, Math.PI * 2);
+      ctx.fillStyle = atmGrad;
+      ctx.fill();
+
+      // Earth Marble
+      const earthGrad = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, radius);
+      earthGrad.addColorStop(0, '#a5dbff');
+      earthGrad.addColorStop(0.35, '#5eaaff');
+      earthGrad.addColorStop(0.75, '#1d42b0');
+      earthGrad.addColorStop(1, '#050c26');
+      
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = earthGrad;
+      ctx.fill();
+
+      // Lunar Orbit Line
+      const moonOrbitX = 32 / warpFactor;
+      const moonOrbitY = 10 / warpFactor;
+      const moonOrbitTilt = -Math.PI / 10;
+      
+      ctx.beginPath();
+      ctx.ellipse(x, y, moonOrbitX, moonOrbitY, moonOrbitTilt, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(94, 170, 255, ${0.15 / warpFactor})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Moon position calculation
+      const moonAngle = time * 0.02;
+      const unrotatedMoonX = Math.cos(moonAngle) * moonOrbitX;
+      const unrotatedMoonY = Math.sin(moonAngle) * moonOrbitY;
+      
+      // Rotate by orbit angle
+      const moonX = x + unrotatedMoonX * Math.cos(moonOrbitTilt) - unrotatedMoonY * Math.sin(moonOrbitTilt);
+      const moonY = y + unrotatedMoonX * Math.sin(moonOrbitTilt) + unrotatedMoonY * Math.cos(moonOrbitTilt);
+      const moonIsBehind = Math.sin(moonAngle) < 0;
+
+      // Draw Moon
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, 3.2 / warpFactor, 0, Math.PI * 2);
+      const moonGrad = ctx.createRadialGradient(moonX - 0.8, moonY - 0.8, 0.2, moonX, moonY, 3.2 / warpFactor);
+      moonGrad.addColorStop(0, '#ffffff');
+      moonGrad.addColorStop(1, '#8fa0b5');
+      ctx.fillStyle = moonGrad;
+      
+      // Add subtle bloom glow if in front
+      if (!moonIsBehind) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 4 / warpFactor;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0; // reset shadow
+
+      // Label
+      ctx.fillStyle = `rgba(155, 163, 208, ${Math.max(0, 0.7 - (warpFactor - 1) * 0.3)})`;
+      ctx.font = 'bold 9px "Sora", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('BUMI & BULAN', x, y + 28 / warpFactor);
+    };
+
+    const drawSaturn = (x, y) => {
+      const radius = 17 / warpFactor;
+      const ringRX = 38 / warpFactor;
+      const ringRY = 9 / warpFactor;
+      const ringTilt = -Math.PI / 10;
+
+      // 1. Back rings
+      ctx.beginPath();
+      ctx.ellipse(x, y, ringRX, ringRY, ringTilt, Math.PI, Math.PI * 2);
+      ctx.strokeStyle = `rgba(212, 163, 92, ${0.45 / warpFactor})`;
+      ctx.lineWidth = 5 / warpFactor;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(x, y, ringRX - 4 / warpFactor, ringRY - 1.2 / warpFactor, ringTilt, Math.PI, Math.PI * 2);
+      ctx.strokeStyle = `rgba(240, 210, 160, ${0.2 / warpFactor})`;
+      ctx.lineWidth = 1.5 / warpFactor;
+      ctx.stroke();
+
+      // 2. Planet Sphere
+      const satGrad = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, radius);
+      satGrad.addColorStop(0, '#ffe8a3');
+      satGrad.addColorStop(0.55, '#d4a35c');
+      satGrad.addColorStop(0.9, '#63441f');
+      satGrad.addColorStop(1, '#3b250e');
+      
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = satGrad;
+      ctx.fill();
+
+      // 3. Front rings
+      ctx.beginPath();
+      ctx.ellipse(x, y, ringRX, ringRY, ringTilt, 0, Math.PI);
+      ctx.strokeStyle = `rgba(212, 163, 92, ${0.85 / warpFactor})`;
+      ctx.lineWidth = 5 / warpFactor;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(x, y, ringRX - 4 / warpFactor, ringRY - 1.2 / warpFactor, ringTilt, 0, Math.PI);
+      ctx.strokeStyle = `rgba(240, 210, 160, ${0.4 / warpFactor})`;
+      ctx.lineWidth = 1.5 / warpFactor;
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = `rgba(155, 163, 208, ${Math.max(0, 0.7 - (warpFactor - 1) * 0.3)})`;
+      ctx.font = 'bold 9px "Sora", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('PLANET SATURNUS', x, y + 32 / warpFactor);
+    };
+
+    const drawAndromeda = (x, y) => {
+      // Core glow
+      const coreGrad = ctx.createRadialGradient(x, y, 2, x, y, 11 / warpFactor);
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.45, `rgba(92, 240, 255, ${0.7 / warpFactor})`);
+      coreGrad.addColorStop(1, 'rgba(176, 122, 255, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(x, y, 11 / warpFactor, 0, Math.PI * 2);
+      ctx.fillStyle = coreGrad;
+      ctx.fill();
+
+      const rotationAngle = time * 0.003;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-Math.PI / 7);
+      ctx.scale(1.0, 0.4);
+
+      andromedaParticles.forEach(p => {
+        const currentTheta = p.theta + rotationAngle;
+        const px = (Math.cos(currentTheta + p.arm) * p.r + Math.cos(currentTheta + Math.PI/2) * p.spread) / warpFactor;
+        const py = (Math.sin(currentTheta + p.arm) * p.r + Math.sin(currentTheta + Math.PI/2) * p.spread) / warpFactor;
+
+        ctx.beginPath();
+        ctx.arc(px, py, p.size / warpFactor, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      });
+
+      ctx.restore();
+
+      // Label
+      ctx.fillStyle = `rgba(155, 163, 208, ${Math.max(0, 0.7 - (warpFactor - 1) * 0.3)})`;
+      ctx.font = 'bold 9px "Sora", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('GALAKSI ANDROMEDA', x, y + 36 / warpFactor);
+    };
+
+    const drawMilkyWay = (x, y) => {
+      // Core glow
+      const coreGrad = ctx.createRadialGradient(x, y, 2, x, y, 13 / warpFactor);
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.45, `rgba(255, 215, 92, ${0.7 / warpFactor})`);
+      coreGrad.addColorStop(1, 'rgba(255, 124, 106, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(x, y, 13 / warpFactor, 0, Math.PI * 2);
+      ctx.fillStyle = coreGrad;
+      ctx.fill();
+
+      const rotationAngle = -time * 0.0025;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 4.5);
+      ctx.scale(1.0, 0.38);
+
+      milkyWayParticles.forEach(p => {
+        const currentTheta = p.theta + rotationAngle;
+        const px = (Math.cos(currentTheta + p.arm) * p.r + Math.cos(currentTheta + Math.PI/2) * p.spread) / warpFactor;
+        const py = (Math.sin(currentTheta + p.arm) * p.r + Math.sin(currentTheta + Math.PI/2) * p.spread) / warpFactor;
+
+        ctx.beginPath();
+        ctx.arc(px, py, p.size / warpFactor, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      });
+
+      ctx.restore();
+
+      // Label
+      ctx.fillStyle = `rgba(155, 163, 208, ${Math.max(0, 0.7 - (warpFactor - 1) * 0.3)})`;
+      ctx.font = 'bold 9px "Sora", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('GALAKSI BIMA SAKTI', x, y + 38 / warpFactor);
+    };
+
     draw();
 
     const handleResize = () => {
@@ -1262,44 +1580,7 @@ export default function App() {
       <canvas id="stars-canvas"></canvas>
       <div id="cursor-glow"></div>
       
-      {/* Real High-Resolution Animated Celestial Elements */}
-      <div className="celestial-universe">
-        {/* Matahari (Sun) */}
-        <div className="celestial-body sun-system" style={{ top: '12%', left: '8%' }}>
-          <div className="sun-glow-overlay"></div>
-          <img src="/sun_realistic.png" className="celestial-img sun-img" alt="Sun" />
-          <div className="celestial-label">Matahari (Solar Core)</div>
-        </div>
-
-        {/* Galaksi Bima Sakti (Milky Way) */}
-        <div className="celestial-body bima-sakti" style={{ top: '48%', left: '78%' }}>
-          <img src="/milkyway_realistic.png" className="celestial-img milkyway-img" alt="Milky Way" />
-          <div className="celestial-label">Galaksi Bima Sakti</div>
-        </div>
-
-        {/* Galaksi Andromeda */}
-        <div className="celestial-body andromeda-galaxy" style={{ top: '76%', left: '12%' }}>
-          <img src="/andromeda_realistic.png" className="celestial-img andromeda-img" alt="Andromeda" />
-          <div className="celestial-label">Galaksi Andromeda</div>
-        </div>
-
-        {/* Saturnus dengan Cincin Indah */}
-        <div className="celestial-body saturn-system" style={{ top: '68%', right: '14%' }}>
-          <img src="/saturn_realistic.png" className="celestial-img saturn-img" alt="Saturn" />
-          <div className="celestial-label">Planet Saturnus</div>
-        </div>
-
-        {/* Bumi & Orbit Bulan */}
-        <div className="celestial-body earth-system" style={{ top: '22%', right: '22%' }}>
-          <div className="earth-orbit-wrapper">
-            <img src="/earth_realistic.png" className="celestial-img earth-img" alt="Earth" />
-            <div className="moon-orbit">
-              <div className="moon-sphere"></div>
-            </div>
-          </div>
-          <div className="celestial-label">Bumi & Bulan</div>
-        </div>
-      </div>
+      {/* Physics-based Celestial Universe is completely simulated & drawn inside the Canvas above */}
 
       <div className="aurora">
         <div className="aurora-band a1"></div>
