@@ -8,7 +8,7 @@ const SUBJECTS = [
   { key: 'rel', name: 'Agama', icon: '🕌' },
   { key: 'ppkn', name: 'PPKn', icon: '⚖️' },
   { key: 'indo', name: 'B. Indonesia', icon: '📝' },
-  { key: 'eng', name: 'B. Inggris', icon: '🇬🇧' },
+  { key: 'eng', name: 'B. Inggris', icon: '🗣️' },
   { key: 'math', name: 'Matematika', icon: '📐' },
   { key: 'ipas', name: 'IPAS', icon: '🧬' },
   { key: 'art', name: 'Seni Budaya', icon: '🎨' },
@@ -142,6 +142,18 @@ export default function App() {
     }
   }, []);
 
+  // ── Sync scanState with body class for canvas transition ──
+  useEffect(() => {
+    if (scanState === 'loading') {
+      document.body.classList.add('loading-scan');
+    } else {
+      document.body.classList.remove('loading-scan');
+    }
+    return () => {
+      document.body.classList.remove('loading-scan');
+    };
+  }, [scanState]);
+
   // ── Background Starry Effects ──
   useEffect(() => {
     const canvas = document.getElementById('stars-canvas');
@@ -150,7 +162,7 @@ export default function App() {
     let width = canvas.width = window.innerWidth;
     let height = canvas.height = window.innerHeight;
 
-    const starCount = 140;
+    const starCount = 200; // Increased count for warp speed glory!
     const stars = [];
 
     for (let i = 0; i < starCount; i++) {
@@ -159,21 +171,67 @@ export default function App() {
         y: Math.random() * height,
         r: Math.random() * 1.5 + 0.5,
         d: Math.random() * starCount,
-        color: ['#7c6aff', '#5cf0ff', '#b07aff', '#ffffff'][Math.floor(Math.random() * 4)]
+        color: ['#7c6aff', '#5cf0ff', '#b07aff', '#ffffff'][Math.floor(Math.random() * 4)],
+        // For 3D Warp vortex
+        angle: Math.random() * Math.PI * 2,
+        distance: Math.random() * Math.max(width, height) * 0.5,
+        speed: Math.random() * 5 + 3
       });
     }
 
     let animId;
     function draw() {
-      ctx.clearRect(0, 0, width, height);
-      stars.forEach(s => {
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = s.color;
-        s.d += 0.015;
-        ctx.globalAlpha = Math.abs(Math.sin(s.d));
-        ctx.fill();
-      });
+      const isLoading = document.body.classList.contains('loading-scan');
+      
+      if (isLoading) {
+        // Dynamic motion blur trail for hyperspace speed!
+        ctx.fillStyle = 'rgba(6, 6, 19, 0.18)';
+        ctx.fillRect(0, 0, width, height);
+
+        stars.forEach(s => {
+          const centerX = width / 2;
+          const centerY = height / 2;
+          
+          s.angle += 0.015; // slow galaxy spiral spin
+          s.distance += s.speed * 3.5; // push outward rapidly
+          s.r = (s.distance / (Math.max(width, height) * 0.5)) * 3.5 + 0.5; // grow bigger as they rush close
+
+          const targetX = centerX + Math.cos(s.angle) * s.distance;
+          const targetY = centerY + Math.sin(s.angle) * s.distance;
+
+          // Draw the beautiful hyperspace star streak
+          ctx.beginPath();
+          ctx.moveTo(centerX + Math.cos(s.angle) * (s.distance - s.speed * 6), centerY + Math.sin(s.angle) * (s.distance - s.speed * 6));
+          ctx.lineTo(targetX, targetY);
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = s.r;
+          ctx.stroke();
+
+          // Reset star if it speeds off screen
+          if (s.distance > Math.max(width, height) * 0.8) {
+            s.distance = Math.random() * 15;
+            s.angle = Math.random() * Math.PI * 2;
+            s.speed = Math.random() * 5 + 3;
+          }
+        });
+      } else {
+        ctx.clearRect(0, 0, width, height);
+        stars.forEach(s => {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = s.color;
+          s.d += 0.015;
+          ctx.globalAlpha = Math.abs(Math.sin(s.d));
+          ctx.fill();
+
+          // Gentle cosmic drifting drift
+          s.x += Math.cos(s.d * 0.1) * 0.05;
+          s.y += Math.sin(s.d * 0.1) * 0.05;
+          if (s.x < 0 || s.x > width) s.x = Math.random() * width;
+          if (s.y < 0 || s.y > height) s.y = Math.random() * height;
+        });
+      }
+
       animId = requestAnimationFrame(draw);
     }
     draw();
@@ -745,12 +803,7 @@ export default function App() {
 
   // ── Backward Compatible Grade & History Resolvers ──
   const getGradeValue = (student, subKey) => {
-    if (!student) return 80;
-    
-    // Direct match in grades map
-    if (student.grades && student.grades[subKey] !== undefined) {
-      return parseFloat(student.grades[subKey]);
-    }
+    if (!student) return "-";
     
     // Mapping of alternative keys (backward compatibility)
     const aliases = {
@@ -762,25 +815,26 @@ export default function App() {
       ipas: ['ipas', 'science'],
       art: ['art', 'seni', 'sbd', 'senibudaya'],
       pe: ['pe', 'penjas', 'pjok'],
-      jawa: ['jawa']
+      jawa: ['jawa', 'bjawa']
     };
     
+    // 1) Try matchedStudent.grades map with all aliases
     const possibleKeys = aliases[subKey] || [subKey];
     if (student.grades) {
       for (const key of possibleKeys) {
-        if (student.grades[key] !== undefined) {
+        if (student.grades[key] !== undefined && student.grades[key] !== null && student.grades[key] !== '') {
           return parseFloat(student.grades[key]);
         }
       }
     }
     
-    // Fallback: Check if there's history for this subject and take the latest value!
+    // 2) Try history latest item with all aliases
     const history = getSubjectHistory(student, subKey);
     if (history && history.length > 0) {
       return parseFloat(history[history.length - 1].val);
     }
     
-    return 80;
+    return "-";
   };
 
   const getSubjectHistory = (student, subKey) => {
@@ -795,7 +849,7 @@ export default function App() {
       ipas: ['ipas', 'science'],
       art: ['art', 'seni', 'sbd', 'senibudaya'],
       pe: ['pe', 'penjas', 'pjok'],
-      jawa: ['jawa']
+      jawa: ['jawa', 'bjawa']
     };
     
     let rawHistory = [];
@@ -809,10 +863,10 @@ export default function App() {
     
     // Map items so they both conform to { date, val }
     return rawHistory.map(h => {
-      const val = h.val !== undefined ? h.val : (h.score !== undefined ? h.score : 80);
+      const val = h.val !== undefined ? h.val : (h.score !== undefined ? h.score : "-");
       const date = h.date || h.timestamp || '—';
-      return { date: String(date), val: parseFloat(val) };
-    });
+      return { date: String(date), val: val !== "-" ? parseFloat(val) : "-" };
+    }).filter(h => h.val !== "-");
   };
 
   // ── Procedural Title Generator (Ultimate Satire Edition) ──
@@ -1488,7 +1542,10 @@ export default function App() {
                   const gen = getPosterMeta(matchedStudent);
                   const violations = matchedStudent.violations_history ? matchedStudent.violations_history.length : 0;
                   const allGrades = SUBJECTS.map(sub => getGradeValue(matchedStudent, sub.key));
-                  const avgVal = (allGrades.reduce((a, b) => a + b, 0) / allGrades.length).toFixed(1);
+                  const numericGrades = allGrades.filter(val => typeof val === 'number' && !isNaN(val));
+                  const avgVal = numericGrades.length > 0 
+                    ? (numericGrades.reduce((a, b) => a + b, 0) / numericGrades.length).toFixed(1) 
+                    : "-";
 
                   // Determine dynamic stamp text and style class based on violations count
                   let stampText = "";
@@ -1595,12 +1652,18 @@ export default function App() {
                           <div className="grade-tiles-compact">
                             {SUBJECTS.map((sub, idx) => {
                               const val = getGradeValue(matchedStudent, sub.key);
-                              let cls = 's-c';
-                              if (val >= 85) cls = 's-a';
-                              else if (val >= 75) cls = 's-b';
-                              else if (val < 60) cls = 's-d';
+                              const isNumeric = typeof val === 'number' && !isNaN(val);
 
-                              const isTop = val === Math.max(...allGrades);
+                              let cls = 's-c';
+                              if (isNumeric) {
+                                if (val >= 85) cls = 's-a';
+                                else if (val >= 75) cls = 's-b';
+                                else if (val < 60) cls = 's-d';
+                              } else {
+                                cls = 's-muted';
+                              }
+
+                              const isTop = isNumeric && val === Math.max(...allGrades.filter(v => typeof v === 'number' && !isNaN(v)));
                               const history = getSubjectHistory(matchedStudent, sub.key);
 
                               return (
@@ -1609,7 +1672,7 @@ export default function App() {
                                   <div className="g-name">{sub.name}</div>
                                   <div className={`g-val ${cls}`}>{val}</div>
                                   <div className="g-bar">
-                                    <div className={cls} style={{ width: `${val}%`, background: val >= 85 ? 'var(--green)' : val >= 75 ? 'var(--blue)' : 'var(--red)' }}></div>
+                                    <div className={cls} style={{ width: isNumeric ? `${val}%` : '0%', background: isNumeric ? (val >= 85 ? 'var(--green)' : val >= 75 ? 'var(--blue)' : 'var(--red)') : 'rgba(255,255,255,0.08)' }}></div>
                                   </div>
                                   
                                   {/* Tooltip history */}
