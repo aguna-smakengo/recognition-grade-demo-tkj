@@ -550,3 +550,414 @@ body.loading-scan #stars-canvas{filter:brightness(1.5) contrast(1.1)}
   font-size: 0.82rem;
   letter-spacing: 0.5px;
 }
+
+/* ═══ CELESTIAL BACKGROUND UNIVERSE ═══ */
+.celestial-universe {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), filter 1.2s ease, opacity 0.8s ease;
+  perspective: 1000px;
+}
+
+/* Warp jump transition behavior for deep space */
+body.warp-jump .celestial-universe {
+  transform: scale(8) rotate(30deg);
+  filter: blur(20px) brightness(4);
+  opacity: 0;
+}
+
+body.warp-jump #stars-canvas {
+  transform: scale(7) rotate(15deg);
+  filter: blur(10px) brightness(5);
+  opacity: 0;
+  transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), filter 1.2s ease, opacity 0.8s ease;
+}
+
+/* Celestial body wrapper */
+.celestial-body {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: floatBody 12s ease-in-out infinite alternate;
+  transform-style: preserve-3d;
+  opacity: 0.45;
+  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.celestial-body:hover {
+  opacity: 0.95;
+  transform: scale(1.15) translateZ(30px);
+}
+
+.celestial-label {
+  font-size: 0.58rem;
+  color: var(--text3);
+  font-family: var(--font-head);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  white-space: nowrap;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+.celestial-body:hover .celestial-label {
+  opacity: 1;
+  color: var(--cyan);
+}
+
+@keyframes floatBody {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-15px) rotate(4deg); }
+}
+
+/* 1. Sun System (Matahari) */
+.sun-system {
+  width: 80px;
+  height: 80px;
+}
+.sun-corona {
+  position: absolute;
+  width: 140%;
+  height: 140%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,183,0,0.45) 0%, rgba(255,72,0,0.18) 50%, transparent 70%);
+  animation: pulseCorona 3.5s ease-in-out infinite alternate;
+}
+.sun-sphere {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #ffffff 0%, #ffd000 50%, #ff4800 100%);
+  box-shadow: 0 0 35px rgba(255,115,0,0.85), inset 0 0 15px rgba(255,255,255,0.6);
+  animation: spinSlow 30s linear infinite;
+}
+@keyframes pulseCorona {
+  0% { transform: scale(0.9) rotate(0deg); opacity: 0.45; }
+  100% { transform: scale(1.18) rotate(15deg); opacity: 0.85; }
+}
+
+/* 2. Saturn System */
+.saturn-system {
+  width: 120px;
+  height: 80px;
+}
+.saturn-sphere {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #ffe8a3 0%, #d4a35c 60%, #69461f 100%);
+  box-shadow: 0 0 20px rgba(212,163,92,0.35), inset 0 0 10px rgba(255,255,255,0.3);
+  z-index: 2;
+  position: relative;
+  top: 10px;
+}
+.saturn-back-ring, .saturn-front-ring {
+  position: absolute;
+  width: 90px;
+  height: 22px;
+  border-radius: 50%;
+  border: 5px solid rgba(212, 163, 92, 0.65);
+  box-shadow: 0 0 10px rgba(212, 163, 92, 0.3);
+  transform: rotate(-12deg) rotateX(75deg);
+  top: 18px;
+}
+.saturn-back-ring {
+  z-index: 1;
+  border-color: rgba(212, 163, 92, 0.35);
+}
+.saturn-front-ring {
+  z-index: 3;
+  clip-path: polygon(0% 50%, 100% 50%, 100% 100%, 0% 100%);
+}
+
+/* 3. Earth System */
+.earth-system {
+  width: 70px;
+  height: 70px;
+  animation-delay: -2s;
+}
+.earth-sphere {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #5eaaff 0%, #2a52be 60%, #0d1b40 100%);
+  box-shadow: 0 0 15px rgba(94,170,255,0.45);
+  position: relative;
+  overflow: hidden;
+}
+.moon-orbit {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  animation: moonSpin 8s linear infinite;
+  top: -12px;
+}
+.moon-sphere {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  box-shadow: 0 0 4px rgba(255,255,255,0.5);
+  position: absolute;
+  top: 0; left: 22px;
+}
+@keyframes moonSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* 4. Andromeda Galaxy */
+.andromeda-galaxy {
+  width: 95px;
+  height: 95px;
+  animation-delay: -4s;
+}
+.andromeda-core {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 20px #5cf0ff, 0 0 40px #b07aff;
+  top: 42px; left: 42px;
+  z-index: 2;
+}
+.andromeda-spiral {
+  width: 95px;
+  height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(176,122,255,0.4) 0%, rgba(92,240,255,0.15) 50%, transparent 80%);
+  border: 1px dashed rgba(92,240,255,0.22);
+  transform: rotate(-25deg) rotateX(60deg);
+  animation: galaxySpin 25s linear infinite;
+}
+
+/* 5. Bima Sakti (Milky Way) */
+.bima-sakti {
+  width: 110px;
+  height: 110px;
+  animation-delay: -6s;
+}
+.galaxy-core {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 25px #ffd75c, 0 0 50px #ff7c6a;
+  top: 49px; left: 49px;
+  z-index: 2;
+}
+.galaxy-arms {
+  width: 110px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,115,0,0.3) 0%, rgba(124,106,255,0.15) 60%, transparent 85%);
+  border: 1px dashed rgba(255,215,92,0.16);
+  transform: rotate(35deg) rotateX(65deg);
+  animation: galaxySpin 35s linear infinite reverse;
+}
+
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+
+
+/* ═══ FUTURISTIC HUD SCANNER RETICLE ═══ */
+.scan-loader-galactic {
+  position: relative;
+  text-align: center;
+  padding: 32px 24px;
+  background: rgba(10,10,26,0.75);
+  border: 1px solid rgba(92,240,255,0.25);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(16px);
+  max-width: 480px;
+  margin: 20px auto;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.65), 0 0 35px rgba(92,240,255,0.12);
+  overflow: hidden;
+  animation: hudScaleIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.15) both;
+}
+@keyframes hudScaleIn {
+  from { transform: scale(0.92) translateY(12px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* Background sci-fi target grid lines */
+.scan-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, rgba(92, 240, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(92, 240, 255, 0.05) 1px, transparent 1px);
+  opacity: 0.85;
+  z-index: 1;
+}
+
+.scan-hud-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* High-tech biometric scanner container */
+.scan-target-box {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  border-radius: 20px;
+  background: rgba(0,0,0,0.45);
+  padding: 8px;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.85), 0 0 15px rgba(92,240,255,0.1);
+}
+
+.face-scanner-bounding {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(92,240,255,0.22);
+}
+
+/* Dynamic scanning laser sweep bar */
+.scan-laser-bar {
+  position: absolute;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  box-shadow: 0 0 12px var(--cyan), 0 0 20px var(--cyan);
+  top: 0;
+  animation: laserSweep 2s ease-in-out infinite;
+  z-index: 10;
+}
+@keyframes laserSweep {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+
+/* Holographic target corner brackets [ ] */
+.corner-bracket {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--cyan);
+  z-index: 12;
+  filter: drop-shadow(0 0 3px var(--cyan));
+  animation: bracketPulse 1s ease-in-out infinite alternate;
+}
+.corner-bracket.tl { top: 6px; left: 6px; border-right: none; border-bottom: none; }
+.corner-bracket.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
+.corner-bracket.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
+.corner-bracket.br { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+
+@keyframes bracketPulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Holographic spinning circular overlay */
+.holo-reticle-ring {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 2px dashed rgba(92,240,255,0.4);
+  top: calc(50% - 65px);
+  left: calc(50% - 65px);
+  animation: spinSlow 8s linear infinite;
+  z-index: 5;
+  pointer-events: none;
+}
+.holo-reticle-ring::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(92,240,255,0.16);
+  border-left-color: var(--cyan);
+  border-right-color: var(--cyan);
+  animation: spinSlow 4s linear infinite reverse;
+}
+
+/* Locking-on crosshair */
+.scanning-crosshair {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.scanning-crosshair::before, .scanning-crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(92,240,255,0.45);
+}
+.scanning-crosshair::before {
+  width: 1px;
+  height: 24px;
+  top: calc(50% - 12px);
+  left: 50%;
+}
+.scanning-crosshair::after {
+  width: 24px;
+  height: 1px;
+  top: 50%;
+  left: calc(50% - 12px);
+}
+
+/* Telemetry terminal logs */
+.scan-telemetry-hud {
+  width: 100%;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: left;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+}
+.telemetry-log {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.log-line {
+  font-size: 0.7rem;
+  letter-spacing: 0.6px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: monospace;
+}
+
+.text-cyan { color: var(--cyan); text-shadow: 0 0 4px rgba(92,240,255,0.45); }
+.text-purple { color: var(--purple); text-shadow: 0 0 4px rgba(176,122,255,0.45); }
+.text-green { color: var(--green); text-shadow: 0 0 4px rgba(86,255,178,0.45); }
+.text-yellow { color: var(--yellow); text-shadow: 0 0 4px rgba(255,215,92,0.45); }
+
+.animate-flicker {
+  animation: flickerText 0.15s ease-in-out infinite alternate;
+}
+@keyframes flickerText {
+  0% { opacity: 0.85; }
+  100% { opacity: 1; }
+}
+
+.delay-1 { animation: slideLog 0.3s ease both 0.4s; opacity: 0; }
+.delay-2 { animation: slideLog 0.3s ease both 0.8s; opacity: 0; }
+.delay-3 { animation: slideLog 0.3s ease both 1.2s; opacity: 0; }
+
+@keyframes slideLog {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

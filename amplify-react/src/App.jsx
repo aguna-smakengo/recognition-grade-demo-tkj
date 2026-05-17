@@ -760,17 +760,33 @@ export default function App() {
               }));
 
               if (dbData.Item) {
-                setMatchedStudent(dbData.Item);
-                setMatchedPhoto(base64);
-                setScanState('result-ok');
+                document.body.classList.add('warp-jump');
+                setTimeout(() => {
+                  setMatchedStudent(dbData.Item);
+                  setMatchedPhoto(base64);
+                  setScanState('result-ok');
+                  document.body.classList.remove('warp-jump');
+                }, 1000);
               } else {
-                showUnknownResult(base64, detected);
+                document.body.classList.add('warp-jump');
+                setTimeout(() => {
+                  showUnknownResult(base64, detected);
+                  document.body.classList.remove('warp-jump');
+                }, 1000);
               }
             } catch (dbErr) {
-              showUnknownResult(base64, detected);
+              document.body.classList.add('warp-jump');
+              setTimeout(() => {
+                showUnknownResult(base64, detected);
+                document.body.classList.remove('warp-jump');
+              }, 1000);
             }
           } else {
-            showUnknownResult(base64, detected);
+            document.body.classList.add('warp-jump');
+            setTimeout(() => {
+              showUnknownResult(base64, detected);
+              document.body.classList.remove('warp-jump');
+            }, 1000);
           }
         });
       });
@@ -1245,6 +1261,48 @@ export default function App() {
       {/* Background Starry Canvas */}
       <canvas id="stars-canvas"></canvas>
       <div id="cursor-glow"></div>
+      
+      {/* Real High-Resolution Animated Celestial Elements */}
+      <div className="celestial-universe">
+        {/* Matahari (Sun) */}
+        <div className="celestial-body sun-system" style={{ top: '12%', left: '8%' }}>
+          <div className="sun-corona"></div>
+          <div className="sun-sphere"></div>
+          <div className="celestial-label">Matahari (Solar Core)</div>
+        </div>
+
+        {/* Galaksi Bima Sakti (Milky Way) */}
+        <div className="celestial-body bima-sakti" style={{ top: '48%', left: '78%' }}>
+          <div className="galaxy-core"></div>
+          <div className="galaxy-arms"></div>
+          <div className="celestial-label">Galaksi Bima Sakti</div>
+        </div>
+
+        {/* Galaksi Andromeda */}
+        <div className="celestial-body andromeda-galaxy" style={{ top: '76%', left: '12%' }}>
+          <div className="andromeda-core"></div>
+          <div className="andromeda-spiral"></div>
+          <div className="celestial-label">Galaksi Andromeda</div>
+        </div>
+
+        {/* Saturnus dengan Cincin Indah */}
+        <div className="celestial-body saturn-system" style={{ top: '68%', right: '14%' }}>
+          <div className="saturn-back-ring"></div>
+          <div className="saturn-sphere"></div>
+          <div className="saturn-front-ring"></div>
+          <div className="celestial-label">Planet Saturnus</div>
+        </div>
+
+        {/* Bumi & Orbit Bulan */}
+        <div className="celestial-body earth-system" style={{ top: '22%', right: '22%' }}>
+          <div className="earth-sphere"></div>
+          <div className="moon-orbit">
+            <div className="moon-sphere"></div>
+          </div>
+          <div className="celestial-label">Bumi & Bulan</div>
+        </div>
+      </div>
+
       <div className="aurora">
         <div className="aurora-band a1"></div>
         <div className="aurora-band a2"></div>
@@ -1523,15 +1581,44 @@ export default function App() {
 
             {/* 2. Loading Recognition */}
             {scanState === 'loading' && (
-              <div className="scan-loader">
-                <div className="scan-anim">
-                  <div className="scan-circle" style={lastCapBase64 ? { backgroundImage: `url('${lastCapBase64}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
-                    <div className="scan-line"></div>
+              <div className="scan-loader-galactic">
+                {/* Overlay Sci-fi Grid */}
+                <div className="scan-grid-overlay"></div>
+                
+                <div className="scan-hud-container">
+                  {/* Glowing Target Reticle */}
+                  <div className="scan-target-box">
+                    <div className="face-scanner-bounding" style={lastCapBase64 ? { backgroundImage: `url('${lastCapBase64}')`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
+                      {/* Laser scanning bar */}
+                      <div className="scan-laser-bar"></div>
+                      
+                      {/* Corner Target Bracket Borders */}
+                      <div className="corner-bracket tl"></div>
+                      <div className="corner-bracket tr"></div>
+                      <div className="corner-bracket bl"></div>
+                      <div className="corner-bracket br"></div>
+                      
+                      {/* Holographic targeting ring */}
+                      <div className="holo-reticle-ring"></div>
+                      
+                      {/* Scanning lock crosshairs */}
+                      <div className="scanning-crosshair"></div>
+                    </div>
                   </div>
-                  <div className="scan-dots"><span></span><span></span><span></span></div>
+
+                  {/* Telemetry data display */}
+                  <div className="scan-telemetry-hud">
+                    <div className="telemetry-log">
+                      <div className="log-line text-cyan font-mono animate-flicker">🚀 COGNITIVE SCAN INITIALIZED...</div>
+                      <div className="log-line text-purple font-mono delay-1">🔍 LOCKING ON CELESTIAL TARGET COORDINATES</div>
+                      <div className="log-line text-green font-mono delay-2">🛰️ CROSS-REFERENCING BIMA SAKTI DATABASES</div>
+                      <div className="log-line text-yellow font-mono delay-3">🌀 EXTRACTING SOUL PROFILE FROM ANDROMEDA ARCHIVES</div>
+                    </div>
+                  </div>
                 </div>
-                <h2>Mengidentifikasi Wajah...</h2>
-                <p>Memproses dengan AWS Rekognition Client-Side</p>
+
+                <h2 className="ai-loading-pulse mt">IDENTIFYING GALACTIC PROFILE...</h2>
+                <p className="ai-loading-pulse-slow">Analyzing biometric matrices with AWS Client-Side AI</p>
               </div>
             )}
 
