@@ -1490,6 +1490,28 @@ export default function App() {
                   const allGrades = SUBJECTS.map(sub => getGradeValue(matchedStudent, sub.key));
                   const avgVal = (allGrades.reduce((a, b) => a + b, 0) / allGrades.length).toFixed(1);
 
+                  // Determine dynamic stamp text and style class based on violations count
+                  let stampText = "";
+                  let stampClass = "violation-stamp";
+                  if (violations > 0) {
+                    if (violations <= 2) {
+                      stampText = "ADA KASUS";
+                      stampClass = "violation-stamp small warning";
+                    } else if (violations <= 5) {
+                      stampText = "MELANGGAR";
+                      stampClass = "violation-stamp";
+                    } else if (violations <= 7) {
+                      stampText = "KASUS BANYAK";
+                      stampClass = "violation-stamp";
+                    } else if (violations <= 10) {
+                      stampText = "KASUS PARAH";
+                      stampClass = "violation-stamp extreme";
+                    } else {
+                      stampText = "MAFIA SEKOLAH";
+                      stampClass = "violation-stamp extreme";
+                    }
+                  }
+
                   return (
                     <div>
                       <div className="res-top-bar">
@@ -1507,9 +1529,9 @@ export default function App() {
                             <div className={`poster poster-${gen.theme} ${gen.bgClass}`}>
                               <div className="poster-bg" style={{ backgroundImage: `url('${matchedPhoto}')` }}></div>
                               <img className="poster-face" src={matchedPhoto} alt="Student Face" />
-                              {gen.stamp && (
-                                <div className="violation-stamp extreme">
-                                  {violations >= 3 ? "KASUS BANYAK" : "ADA KASUS"}
+                              {gen.stamp && stampText && (
+                                <div className={stampClass}>
+                                  {stampText}
                                   <small>
                                     {matchedStudent.violations_history[matchedStudent.violations_history.length - 1].note}
                                   </small>
