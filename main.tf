@@ -24,6 +24,7 @@ resource "null_resource" "pip_install" {
   triggers = {
     requirements = filesha256("${path.module}/requirements.txt")
     app_py       = filesha256("${path.module}/app.py")
+    always_run   = timestamp()
   }
 
   provisioner "local-exec" {
