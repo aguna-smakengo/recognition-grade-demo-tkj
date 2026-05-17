@@ -61,12 +61,16 @@ export default function App() {
   const [regName, setRegName] = useState('');
   const [regClass, setRegClass] = useState('');
   const [regReligion, setRegReligion] = useState('');
+  const [regCustomTitle, setRegCustomTitle] = useState('');
+  const [regCustomTagline, setRegCustomTagline] = useState('');
 
   // Student list
   const [students, setStudents] = useState([]);
   const [editingStudent, setEditingStudent] = useState(null);
   const [editViolations, setEditViolations] = useState('');
   const [editGrades, setEditGrades] = useState({});
+  const [editCustomTitle, setEditCustomTitle] = useState('');
+  const [editCustomTagline, setEditCustomTagline] = useState('');
 
   // Student Scan Screen States
   const [scanState, setScanState] = useState('scan'); // 'scan', 'loading', 'result-ok', 'result-no'
@@ -400,6 +404,8 @@ export default function App() {
     setRegName('');
     setRegClass('');
     setRegReligion('');
+    setRegCustomTitle('');
+    setRegCustomTagline('');
   };
 
   // ── Register New Student ──
@@ -439,7 +445,9 @@ export default function App() {
             thumbnail: lastCapBase64,
             grades: { rel: 80, ppkn: 80, indo: 80, eng: 80, math: 80, ipas: 80, art: 80, pe: 80, jawa: 80 },
             grades_history: {},
-            violations_history: []
+            violations_history: [],
+            customTitle: regCustomTitle.trim(),
+            customTagline: regCustomTagline.trim()
           };
 
           try {
@@ -567,6 +575,8 @@ export default function App() {
   const openEditGrades = (s) => {
     setEditingStudent(s);
     setEditViolations(s.violations_history ? s.violations_history.map(v => v.note).join(', ') : '');
+    setEditCustomTitle(s.customTitle || '');
+    setEditCustomTagline(s.customTagline || '');
     const initialGrades = {};
     SUBJECTS.forEach(sub => {
       initialGrades[sub.key] = s.grades && s.grades[sub.key] !== undefined ? s.grades[sub.key] : 80;
@@ -580,6 +590,8 @@ export default function App() {
     try {
       let s = { ...editingStudent };
       s.grades = { ...editGrades };
+      s.customTitle = editCustomTitle.trim();
+      s.customTagline = editCustomTagline.trim();
 
       if (editViolations.trim()) {
         s.violations_history = editViolations.split(',').map(n => ({
@@ -714,6 +726,16 @@ export default function App() {
     const vList = s.violations_history || [];
     const violations = vList.length;
     const agama = s.agama || '';
+
+    // Priority 0: Custom Teacher Title & Tagline Override
+    if (s.customTitle || s.customTagline) {
+      return {
+        title: s.customTitle || "Rakyat Santuy",
+        tagline: s.customTagline || "Belajar secukupnya, tidur sepuasnya, tetap jadi idaman calon mertua di masa depan.",
+        theme: "bjawa",
+        bgClass: "bg-math-3"
+      };
+    }
 
     // Rule: Bule Jawa (Priority 1)
     if (grades.eng >= 85 && grades.jawa >= 85) {
@@ -1066,6 +1088,15 @@ export default function App() {
                       </select>
                     </div>
 
+                    <div className="field">
+                      <label>Gelar Kosmik Kustom (Optional)</label>
+                      <input value={regCustomTitle} onChange={(e) => setRegCustomTitle(e.target.value)} placeholder="Contoh: Sang Master Sepakbola" />
+                    </div>
+                    <div className="field">
+                      <label>Kata-Kata Kustom Poster (Optional)</label>
+                      <input value={regCustomTagline} onChange={(e) => setRegCustomTagline(e.target.value)} placeholder="Contoh: Lari 10km sehari, tapi tidak berani lari dari kenyataan." />
+                    </div>
+
                     <button className="btn warning full mt lg" onClick={registerStudent}>✅ Daftarkan Wajah & Simpan</button>
                     <button className="btn ghost full mt" onClick={resetQs}>Batal</button>
                   </div>
@@ -1356,6 +1387,17 @@ export default function App() {
             <div className="field">
               <label>Catatan Pelanggaran (Pisahkan dengan koma jika lebih dari satu)</label>
               <input type="text" value={editViolations} onChange={(e) => setEditViolations(e.target.value)} placeholder="e.g. Tidur di kelas, Telat masuk gerbang" />
+            </div>
+
+            <div className="field-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div className="field" style={{ margin: 0 }}>
+                <label>Gelar Kosmik Kustom (Optional)</label>
+                <input type="text" value={editCustomTitle} onChange={(e) => setEditCustomTitle(e.target.value)} placeholder="Contoh: Sang Master Sepakbola" />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>Kata-Kata Kustom Poster (Optional)</label>
+                <input type="text" value={editCustomTagline} onChange={(e) => setEditCustomTagline(e.target.value)} placeholder="Contoh: Lari 10km sehari..." />
+              </div>
             </div>
             
             <div className="subjects-grid">
