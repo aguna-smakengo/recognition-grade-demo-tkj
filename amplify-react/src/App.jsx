@@ -2238,14 +2238,20 @@ export default function App() {
 
                       return (
                         <div className="stu-row" key={s.studentId}>
-                          <img src={thumb} alt="Avatar" />
-                          <div>
-                            <strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>{s.name}</strong>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>NIS: {s.studentId} | Kelas: {s.kelas} | Agama: {s.agama}</div>
+                          <div className="stu-row-left">
+                            <img src={thumb} alt="Avatar" className="stu-avatar" />
+                            <div className="stu-info">
+                              <strong className="stu-name">{s.name}</strong>
+                              <div className="stu-meta">NIS: {s.studentId} | Kelas: {s.kelas} | Agama: {s.agama}</div>
+                            </div>
                           </div>
-                          <div><span className="pill">Avg: {avg}</span></div>
-                          <div><span className="pill" style={{ color: 'var(--red)', borderColor: 'var(--red)', background: 'rgba(232,74,90,.05)' }}>Kasus: {violations}</span></div>
-                          <div className="stu-actions">
+                          
+                          <div className="stu-row-mid">
+                            <span className="pill avg-pill">Avg: {avg}</span>
+                            <span className="pill kasus-pill">Kasus: {violations}</span>
+                          </div>
+
+                          <div className="stu-row-right">
                             <button className="edit-btn" onClick={() => openEditGrades(s)}>✏️ Edit</button>
                             <button className="del-btn" onClick={() => deleteStudent(s.studentId, s.faceId)}>🗑️ Hapus</button>
                           </div>
