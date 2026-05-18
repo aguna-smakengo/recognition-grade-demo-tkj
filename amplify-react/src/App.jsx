@@ -477,6 +477,7 @@ export default function App() {
   const [detectedFaces, setDetectedFaces] = useState([]);
   const [originalPhoto, setOriginalPhoto] = useState(null);
   const [resolvedNames, setResolvedNames] = useState({});
+  const [selectedFaceIndex, setSelectedFaceIndex] = useState(null);
 
   // Video Refs
   const teacherVideoRef = useRef(null);
@@ -1084,32 +1085,59 @@ export default function App() {
     }
   };
 
-  // ── Quick Scanner Snap & Check ──
-  const snapAndCheck = async () => {
+  // ── Unified Teacher Face Processor ──
+  const processTeacherFace = async (base64, isCropped = false, faceIndex = null) => {
+    setLastCapBase64(base64);
+
     if (!rekClient || !dbClient) {
-      triggerToast('Please configure AWS Credentials first!', 'fail');
+      triggerToast('AWS Credentials are not configured!', 'fail');
       return;
     }
-
-    const vid = teacherVideoRef.current;
-    if (!vid) return;
-
-    const cnv = document.createElement('canvas');
-    cnv.width = vid.videoWidth;
-    cnv.height = vid.videoHeight;
-    const ctx = cnv.getContext('2d');
-    ctx.drawImage(vid, 0, 0);
-    
-    const base64 = cnv.toDataURL('image/jpeg', 0.85);
-    setLastCapBase64(base64);
-    stopCamera();
 
     setQsMsg('MENGANALISIS WAJAH...');
     setQsMsgType('ok');
 
     try {
       const imageBytes = base64ToByteArray(base64);
-      
+
+      if (!isCropped) {
+        rekClient.detectFaces({
+          Image: { Bytes: imageBytes },
+          Attributes: ["ALL"]
+        }, (detErr, detData) => {
+          if (!detErr && detData.FaceDetails && detData.FaceDetails.length > 1) {
+            setOriginalPhoto(base64);
+            setDetectedFaces(detData.FaceDetails);
+            
+            const initialNames = {};
+            detData.FaceDetails.forEach((face, idx) => {
+              initialNames[idx] = '🔍 Mencari...';
+              resolveFaceName(base64, face, idx);
+            });
+            setResolvedNames(initialNames);
+            
+            setQsState('picker');
+            setQsMsg('');
+            return;
+          }
+
+          // Single face fallback
+          searchTeacherSingleFace(base64, imageBytes);
+        });
+      } else {
+        if (faceIndex !== null) {
+          setSelectedFaceIndex(faceIndex);
+        }
+        searchTeacherSingleFace(base64, imageBytes);
+      }
+    } catch (e) {
+      setQsMsg('Error: ' + e.message);
+      setQsMsgType('fail');
+    }
+  };
+
+  const searchTeacherSingleFace = async (base64, imageBytes) => {
+    try {
       const searchParams = {
         CollectionId: cfgCollection,
         Image: { Bytes: imageBytes },
@@ -1120,8 +1148,9 @@ export default function App() {
       rekClient.searchFacesByImage(searchParams, async (err, data) => {
         if (err) {
           console.error(err);
-          setQsMsg('AWS Rekognition Error: ' + err.message);
-          setQsMsgType('fail');
+          setRegNis('');
+          setQsState('register');
+          setQsMsg('');
           return;
         }
 
@@ -1139,7 +1168,6 @@ export default function App() {
               setQsState('add-event');
               setQsMsg('');
             } else {
-              // Indexed in Rekognition but missing in DynamoDB
               setRegNis(studentId);
               setQsState('register');
               setQsMsg('');
@@ -1149,29 +1177,65 @@ export default function App() {
             setQsMsgType('fail');
           }
         } else {
-          // New Face unregistered
           setRegNis('');
           setQsState('register');
           setQsMsg('');
         }
       });
-
     } catch (e) {
       setQsMsg('Error: ' + e.message);
       setQsMsgType('fail');
     }
   };
 
+  // ── Quick Scanner Snap & Check ──
+  const snapAndCheck = async () => {
+    if (!rekClient || !dbClient) {
+      triggerToast('Please configure AWS Credentials first!', 'fail');
+      return;
+    }
+
+    const vid = teacherVideoRef.current;
+    if (!vid) return;
+
+    const cnv = document.createElement('canvas');
+    cnv.width = vid.videoWidth;
+    cnv.height = vid.videoHeight;
+    const ctx = cnv.getContext('2d');
+    ctx.drawImage(vid, 0, 0);
+    
+    const base64 = cnv.toDataURL('image/jpeg', 0.85);
+    stopCamera();
+
+    processTeacherFace(base64);
+  };
+
   const resetQs = () => {
-    setQsState('scanner');
-    setQsStudent(null);
-    setQsMsg('');
-    setRegNis('');
-    setRegName('');
-    setRegClass('');
-    setRegReligion('');
-    setRegCustomTitle('');
-    setRegCustomTagline('');
+    if (detectedFaces && detectedFaces.length > 1) {
+      setQsState('picker');
+      setQsStudent(null);
+      setQsMsg('');
+      setRegNis('');
+      setRegName('');
+      setRegClass('');
+      setRegReligion('');
+      setRegCustomTitle('');
+      setRegCustomTagline('');
+      setSelectedFaceIndex(null);
+    } else {
+      setQsState('scanner');
+      setQsStudent(null);
+      setQsMsg('');
+      setRegNis('');
+      setRegName('');
+      setRegClass('');
+      setRegReligion('');
+      setRegCustomTitle('');
+      setRegCustomTagline('');
+      setDetectedFaces([]);
+      setOriginalPhoto(null);
+      setSelectedFaceIndex(null);
+    }
   };
 
   const handleTeacherFile = (e) => {
@@ -1190,63 +1254,8 @@ export default function App() {
       return;
     }
 
-    setLastCapBase64(base64);
     stopCamera();
-
-    setQsMsg('MENGANALISIS WAJAH...');
-    setQsMsgType('ok');
-
-    try {
-      const imageBytes = base64ToByteArray(base64);
-      
-      const searchParams = {
-        CollectionId: cfgCollection,
-        Image: { Bytes: imageBytes },
-        MaxFaces: 1,
-        FaceMatchThreshold: 80
-      };
-
-      rekClient.searchFacesByImage(searchParams, async (err, data) => {
-        if (err) {
-          console.error(err);
-          setQsMsg('AWS Rekognition Error: ' + err.message);
-          setQsMsgType('fail');
-          return;
-        }
-
-        if (data.FaceMatches && data.FaceMatches.length > 0) {
-          const studentId = data.FaceMatches[0].Face.ExternalImageId;
-          
-          try {
-            const dbData = await dbClient.send(new GetCommand({
-              TableName: cfgTable,
-              Key: { studentId }
-            }));
-
-            if (dbData.Item) {
-              setQsStudent(dbData.Item);
-              setQsState('add-event');
-              setQsMsg('');
-            } else {
-              setRegNis(studentId);
-              setQsState('register');
-              setQsMsg('');
-            }
-          } catch (dbErr) {
-            setQsMsg('DynamoDB Error: ' + dbErr.message);
-            setQsMsgType('fail');
-          }
-        } else {
-          setRegNis('');
-          setQsState('register');
-          setQsMsg('');
-        }
-      });
-
-    } catch (e) {
-      setQsMsg('Error: ' + e.message);
-      setQsMsgType('fail');
-    }
+    processTeacherFace(base64);
   };
 
   // ── Register New Student ──
@@ -1297,6 +1306,9 @@ export default function App() {
               Item: newStudent
             }));
             triggerToast('Registrasi Siswa Baru Sukses!', 'ok');
+            if (selectedFaceIndex !== null) {
+              setResolvedNames(prev => ({ ...prev, [selectedFaceIndex]: regName }));
+            }
             resetQs();
           } catch (dbErr) {
             triggerToast('Gagal simpan DynamoDB: ' + dbErr.message, 'fail');
@@ -2412,6 +2424,84 @@ export default function App() {
 
                     <button className="btn warning full mt lg" onClick={registerStudent}>✅ Daftarkan Wajah & Simpan</button>
                     <button className="btn ghost full mt" onClick={resetQs}>Batal</button>
+                  </div>
+                )}
+
+                {/* 5. Multi-Face Picker (Teacher) */}
+                {qsState === 'picker' && (
+                  <div className="card" style={{ maxWidth: '650px', margin: '0 auto', animation: 'fadeIn 0.5s ease', textAlign: 'center' }}>
+                    <h3 style={{ fontSize: '1.8rem', marginBottom: '8px', color: 'var(--yellow)' }}>🛰️ DETEKSI MULTI-WAJAH (TEACHER)</h3>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.92rem', marginBottom: '20px' }}>
+                      Ditemukan <strong>{detectedFaces.length} wajah</strong>. Silakan ketuk/pilih wajah target di bawah ini untuk menginput nilai atau mendaftarkannya!
+                    </p>
+                    
+                    <div className="fp-img-wrap" style={{ position: 'relative', overflow: 'hidden', borderRadius: '18px', border: '2px solid rgba(124,106,255,0.3)', boxShadow: '0 15px 50px rgba(0,0,0,0.6)', margin: '0 auto 24px' }}>
+                      <img src={originalPhoto} style={{ width: '100%', display: 'block', borderRadius: '16px' }} alt="Original Capture" />
+                      
+                      <div id="fp-boxes">
+                        {detectedFaces.map((face, index) => {
+                          const box = face.BoundingBox;
+                          
+                          // Add 1.5% padding expansion
+                          const pad = 0.015; 
+                          const boxLeft = Math.max(0, box.Left - pad);
+                          const boxTop = Math.max(0, box.Top - pad);
+                          const boxWidth = Math.min(1 - boxLeft, box.Width + pad * 2);
+                          const boxHeight = Math.min(1 - boxTop, box.Height + pad * 2);
+
+                          const style = {
+                            left: `${(boxLeft * 100).toFixed(2)}%`,
+                            top: `${(boxTop * 100).toFixed(2)}%`,
+                            width: `${(boxWidth * 100).toFixed(2)}%`,
+                            height: `${(boxHeight * 100).toFixed(2)}%`,
+                            background: 'rgba(232, 200, 74, 0.08)',
+                            border: '2px solid var(--yellow)',
+                            borderRadius: '8px',
+                            boxShadow: '0 0 10px rgba(232, 200, 74, 0.2)'
+                          };
+
+                          const displayName = resolvedNames[index] || '🔍 Mencari...';
+                          let tagStyle = { animation: 'aiPulse 2s infinite' };
+                          if (displayName === 'Wajah Baru') {
+                            tagStyle = { background: 'rgba(232, 74, 90, 0.9)', boxShadow: '0 0 10px rgba(232,74,90,0.5)', color: '#fff' };
+                          } else if (displayName !== '🔍 Mencari...') {
+                            tagStyle = { background: 'rgba(74, 232, 138, 0.9)', boxShadow: '0 0 10px rgba(74,232,138,0.5)', color: '#000', fontWeight: 'bold' };
+                          }
+
+                          return (
+                            <div 
+                              key={index} 
+                              className="face-box" 
+                              style={style}
+                              onClick={async () => {
+                                triggerToast(displayName !== 'Wajah Baru' && displayName !== '🔍 Mencari...' ? `Memproses data ${displayName}...` : `Mengekstrak Wajah #${index + 1}...`, 'ok');
+                                const cropped = await cropFace(originalPhoto, box);
+                                processTeacherFace(cropped, true, index);
+                              }}
+                            >
+                              <div className="fb-tag" style={tagStyle}>{displayName}</div>
+                              <div className="corner-bracket tl" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', top: '2px', left: '2px' }}></div>
+                              <div className="corner-bracket tr" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', top: '2px', right: '2px' }}></div>
+                              <div className="corner-bracket bl" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', bottom: '2px', left: '2px' }}></div>
+                              <div className="corner-bracket br" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', bottom: '2px', right: '2px' }}></div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    <button 
+                      className="btn ghost lg full" 
+                      onClick={() => {
+                        setQsState('scanner');
+                        setDetectedFaces([]);
+                        setOriginalPhoto(null);
+                        setSelectedFaceIndex(null);
+                        setTimeout(() => startCamera(teacherVideoRef), 100);
+                      }}
+                    >
+                      ← Batal & Ulangi Scan
+                    </button>
                   </div>
                 )}
               </section>
