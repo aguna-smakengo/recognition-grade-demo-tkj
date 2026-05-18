@@ -1547,21 +1547,27 @@ export default function App() {
         const width = box.Width * img.width;
         const height = box.Height * img.height;
 
-        const padX = width * 0.25;
-        const padY = height * 0.25;
+        // Increase padding to 30% for safer Rekognition context (hair, chin, borders)
+        const padX = width * 0.3;
+        const padY = height * 0.3;
 
         const cropX = Math.max(0, left - padX);
         const cropY = Math.max(0, top - padY);
         const cropW = Math.min(img.width - cropX, width + padX * 2);
         const cropH = Math.min(img.height - cropY, height + padY * 2);
 
-        canvas.width = cropW;
-        canvas.height = cropH;
+        // Enforce a minimum upscaled size of 250x250 pixels for Rekognition compatibility!
+        const targetSize = Math.max(250, Math.max(cropW, cropH));
+        canvas.width = targetSize;
+        canvas.height = targetSize;
 
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, targetSize, targetSize);
 
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
       };
       img.src = base64;
     });
@@ -1666,9 +1672,17 @@ export default function App() {
           FaceMatchThreshold: 80
         }, async (err, data) => {
           if (err) {
-            triggerToast('Gagal mengenali wajah: ' + err.message, 'fail');
-            setScanState('scan');
-            setTimeout(() => startCamera(studentVideoRef), 100);
+            console.warn('AWS Rekognition search error:', err);
+            setMatchedPhoto(base64);
+            setScanState('zooming');
+            document.body.classList.add('warp-jump');
+            
+            setTimeout(() => {
+              setShowWarpFlash(true);
+              showUnknownResult(base64, detected);
+              document.body.classList.remove('warp-jump');
+              setTimeout(() => setShowWarpFlash(false), 1200);
+            }, 800);
             return;
           }
 
