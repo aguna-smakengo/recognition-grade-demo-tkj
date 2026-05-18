@@ -1559,14 +1559,26 @@ export default function App() {
         const width = box.Width * img.width;
         const height = box.Height * img.height;
 
-        // Increase padding to 30% for safer Rekognition context (hair, chin, borders)
-        const padX = width * 0.3;
-        const padY = height * 0.3;
+        // Find the center of the face
+        const centerX = left + width / 2;
+        const centerY = top + height / 2;
 
-        const cropX = Math.max(0, left - padX);
-        const cropY = Math.max(0, top - padY);
-        const cropW = Math.min(img.width - cropX, width + padX * 2);
-        const cropH = Math.min(img.height - cropY, height + padY * 2);
+        // Determine size of square based on max of width and height + padding
+        const maxDim = Math.max(width, height);
+        const pad = maxDim * 0.3; // 30% padding around the larger dimension
+        const size = maxDim + pad * 2;
+
+        // Attempt square crop centered on the face
+        let cropX = centerX - size / 2;
+        let cropY = centerY - size / 2;
+        let cropW = size;
+        let cropH = size;
+
+        // Clamp to image boundaries
+        if (cropX < 0) cropX = 0;
+        if (cropY < 0) cropY = 0;
+        if (cropX + cropW > img.width) cropW = img.width - cropX;
+        if (cropY + cropH > img.height) cropH = img.height - cropY;
 
         // Enforce a minimum upscaled size of 250x250 pixels for Rekognition compatibility!
         const targetSize = Math.max(250, Math.max(cropW, cropH));
@@ -1574,10 +1586,19 @@ export default function App() {
         canvas.height = targetSize;
 
         const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#080816'; // Sleek dark galaxy theme background color instead of blank white/black!
+        ctx.fillRect(0, 0, targetSize, targetSize);
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-        
-        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, targetSize, targetSize);
+
+        // Calculate scaling factor to fit the targetSize square canvas without distortion
+        const scale = targetSize / Math.max(cropW, cropH);
+        const drawW = cropW * scale;
+        const drawH = cropH * scale;
+        const dx = (targetSize - drawW) / 2;
+        const dy = (targetSize - drawH) / 2;
+
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, dx, dy, drawW, drawH);
 
         resolve(canvas.toDataURL('image/jpeg', 0.92));
       };
