@@ -1254,7 +1254,16 @@ export default function App() {
           val: score
         });
 
-        s.grades[qsSubject] = score;
+        // Compute the new average including the item we just added
+        const historyItems = getSubjectHistory(s, qsSubject);
+        const allVals = historyItems.map(h => h.val).filter(v => typeof v === 'number' && !isNaN(v));
+        if (allVals.length > 0) {
+          const sum = allVals.reduce((a, b) => a + b, 0);
+          s.grades[qsSubject] = parseFloat((sum / allVals.length).toFixed(1));
+        } else {
+          s.grades[qsSubject] = score;
+        }
+
         triggerToast('Nilai berhasil ditambahkan!', 'ok');
       } else {
         if (!qsNote.trim()) {
@@ -1353,24 +1362,29 @@ export default function App() {
       s.grades = { ...s.grades };
       s.grades_history = { ...s.grades_history };
       
-      // We loop through the subject inputs and add/subtract from current values
+      // We loop through the subject inputs and append the new assignment/exam grade to history
       Object.entries(editGrades).forEach(([key, val]) => {
         if (val !== '' && val !== undefined && val !== null) {
-          const addVal = parseFloat(val);
-          if (addVal !== 0) {
-            const currentVal = getGradeValue(editingStudent, key);
-            const numericCurrentVal = (currentVal !== '-' && currentVal !== undefined && currentVal !== null) ? parseFloat(currentVal) : 80;
-            
-            // Calculate new grade, clamped to 0-100
-            const newVal = Math.max(0, Math.min(100, numericCurrentVal + addVal));
-            s.grades[key] = newVal;
-
-            // Push to history
+          const newGrade = parseFloat(val);
+          if (!isNaN(newGrade) && newGrade >= 0 && newGrade <= 100) {
+            // Append to history
             s.grades_history[key] = [...(s.grades_history[key] || [])];
             s.grades_history[key].push({
               date: getJakartaTime(),
-              val: newVal
+              val: newGrade
             });
+
+            // Get all grades from history to compute the new average
+            const historyItems = getSubjectHistory(s, key); // retrieves standard mapped { date, val } items
+            const allVals = historyItems.map(h => h.val).filter(v => typeof v === 'number' && !isNaN(v));
+            
+            if (allVals.length > 0) {
+              const sum = allVals.reduce((a, b) => a + b, 0);
+              const avg = parseFloat((sum / allVals.length).toFixed(1));
+              s.grades[key] = avg; // s.grades stores the average!
+            } else {
+              s.grades[key] = newGrade;
+            }
           }
         }
       });
@@ -1392,7 +1406,7 @@ export default function App() {
         Item: s
       }));
 
-      triggerToast('Poin nilai berhasil ditambahkan!', 'ok');
+      triggerToast('Nilai baru berhasil ditambahkan!', 'ok');
       setEditingStudent(null);
       loadStudents();
     } catch (e) {
@@ -1583,7 +1597,17 @@ export default function App() {
       jawa: ['jawa', 'bjawa']
     };
     
-    // 1) Try matchedStudent.grades map with all aliases
+    // 1) Try history average first
+    const history = getSubjectHistory(student, subKey);
+    if (history && history.length > 0) {
+      const allVals = history.map(h => h.val).filter(v => typeof v === 'number' && !isNaN(v));
+      if (allVals.length > 0) {
+        const sum = allVals.reduce((a, b) => a + b, 0);
+        return parseFloat((sum / allVals.length).toFixed(1));
+      }
+    }
+    
+    // 2) Try matchedStudent.grades map (default score or manual average)
     const possibleKeys = aliases[subKey] || [subKey];
     if (student.grades) {
       for (const key of possibleKeys) {
@@ -1591,12 +1615,6 @@ export default function App() {
           return parseFloat(student.grades[key]);
         }
       }
-    }
-    
-    // 2) Try history latest item with all aliases
-    const history = getSubjectHistory(student, subKey);
-    if (history && history.length > 0) {
-      return parseFloat(history[history.length - 1].val);
     }
     
     return "-";
@@ -2555,11 +2573,11 @@ export default function App() {
         <div className="modal-bg">
           <div className="modal" style={{ maxWidth: '960px', width: '100%' }}>
             <button className="close-x" onClick={() => setEditingStudent(null)}>×</button>
-            <h2>✏️ Add Grades & Violations</h2>
+            <h2>✏️ Add Assignment/Exam Grades</h2>
             <p style={{ color: 'var(--text2)', marginBottom: '15px' }}>{editingStudent.name} ({editingStudent.kelas})</p>
             
             <div className="info-strip" style={{ marginBottom: '20px', background: 'rgba(124, 106, 255, 0.05)', borderLeft: '3px solid var(--accent)' }}>
-              💡 <strong>Tips Guru:</strong> Masukkan jumlah poin (misal: <code>5</code> atau <code>-5</code>) untuk ditambahkan ke nilai saat ini. Kosongkan jika tidak ada perubahan.
+              💡 <strong>Info Sistem Rata-Rata:</strong> Masukkan nilai ujian atau tugas baru siswa (skala <code>0-100</code>). Nilai baru akan ditambahkan ke riwayat nilai, dan dashboard akan menampilkan rata-rata dari seluruh riwayat nilainya! Kosongkan jika tidak ada perubahan.
             </div>
 
             <div className="field">
@@ -2581,24 +2599,29 @@ export default function App() {
             <div className="subjects-grid">
               {SUBJECTS.map(sub => {
                 const currentGrade = getGradeValue(editingStudent, sub.key);
+                const historyItems = getSubjectHistory(editingStudent, sub.key);
                 const val = editGrades[sub.key];
-                const isPositive = parseFloat(val) > 0;
-                const isNegative = parseFloat(val) < 0;
-                const prefix = isNegative ? '' : '+';
-                const prefixColor = isPositive ? 'var(--green)' : (isNegative ? 'var(--red)' : 'var(--text3)');
+                
+                const historyStr = historyItems.length > 0 
+                  ? historyItems.map(h => h.val).join(', ') 
+                  : 'Belum ada riwayat';
 
                 return (
-                  <div className="subj-card" key={sub.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '16px' }}>
+                  <div className="subj-card" key={sub.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '16px', minHeight: '220px' }}>
                     <div className="ico" style={{ fontSize: '1.8rem', marginBottom: '4px' }}>{sub.icon}</div>
                     <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text2)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>{sub.name}</label>
                     
-                    <div className="current-grade" style={{ fontSize: '0.85rem', color: 'var(--text3)', marginBottom: '8px' }}>
-                      Nilai: <strong style={{ color: 'var(--cyan)' }}>{currentGrade}</strong>
+                    <div className="current-grade" style={{ fontSize: '0.88rem', color: 'var(--text1)', marginBottom: '2px', fontWeight: 'bold' }}>
+                      Rata-Rata: <span style={{ color: 'var(--cyan)' }}>{currentGrade}</span>
                     </div>
 
-                    <div className="add-input-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }}>
-                      <span style={{ fontSize: '1.3rem', color: prefixColor, fontWeight: 'bold', transition: 'color 0.2s', width: '16px', textAlign: 'center' }}>
-                        {parseFloat(val) !== 0 && val !== '' ? prefix : ''}
+                    <div className="history-scores" style={{ fontSize: '0.72rem', color: 'var(--text3)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '12px' }} title={`Riwayat: ${historyStr}`}>
+                      Riwayat: <span style={{ color: 'var(--text2)' }}>{historyStr}</span>
+                    </div>
+
+                    <div className="add-input-wrapper" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '100%' }}>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text3)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Nilai Ujian/Tugas Baru
                       </span>
                       <input 
                         type="number" 
@@ -2607,11 +2630,11 @@ export default function App() {
                           const v = e.target.value; 
                           setEditGrades({ ...editGrades, [sub.key]: v === '' ? '' : parseFloat(v) }); 
                         }} 
-                        placeholder="0" 
-                        min="-100" 
+                        placeholder="0-100" 
+                        min="0" 
                         max="100" 
                         style={{ 
-                          width: '80px', 
+                          width: '90px', 
                           textAlign: 'center', 
                           fontSize: '1.1rem',
                           padding: '6px 8px',
@@ -2620,8 +2643,8 @@ export default function App() {
                           background: 'var(--bg)',
                           color: 'var(--text)',
                           fontWeight: '600',
-                          borderColor: isPositive ? 'rgba(86, 255, 178, 0.4)' : (isNegative ? 'rgba(255, 92, 122, 0.4)' : 'var(--border)'),
-                          boxShadow: isPositive ? '0 0 10px rgba(86, 255, 178, 0.15)' : (isNegative ? '0 0 10px rgba(255, 92, 122, 0.15)' : 'none'),
+                          borderColor: val !== '' ? 'var(--accent)' : 'var(--border)',
+                          boxShadow: val !== '' ? '0 0 10px var(--accent-glow)' : 'none',
                           transition: 'all 0.2s ease'
                         }} 
                       />
