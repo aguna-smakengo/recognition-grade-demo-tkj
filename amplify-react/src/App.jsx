@@ -466,12 +466,16 @@ export default function App() {
   const [editCustomTagline, setEditCustomTagline] = useState('');
 
   // Student Scan Screen States
-  const [scanState, setScanState] = useState('scan'); // 'scan', 'loading', 'result-ok', 'result-no'
+  const [scanState, setScanState] = useState('scan'); // 'scan', 'loading', 'result-ok', 'result-no', 'picker'
   const [unknownAttrs, setUnknownAttrs] = useState([]);
   const [matchedStudent, setMatchedStudent] = useState(null);
   const [matchedPhoto, setMatchedPhoto] = useState('');
   const [historySubject, setHistorySubject] = useState(null);
   const [historyData, setHistoryData] = useState([]);
+
+  // Face Picker States for Multiple Faces
+  const [detectedFaces, setDetectedFaces] = useState([]);
+  const [originalPhoto, setOriginalPhoto] = useState(null);
 
   // Video Refs
   const teacherVideoRef = useRef(null);
@@ -1517,7 +1521,37 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  const processStudentFace = async (base64) => {
+  const cropFace = (base64, box) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const left = box.Left * img.width;
+        const top = box.Top * img.height;
+        const width = box.Width * img.width;
+        const height = box.Height * img.height;
+
+        const padX = width * 0.25;
+        const padY = height * 0.25;
+
+        const cropX = Math.max(0, left - padX);
+        const cropY = Math.max(0, top - padY);
+        const cropW = Math.min(img.width - cropX, width + padX * 2);
+        const cropH = Math.min(img.height - cropY, height + padY * 2);
+
+        canvas.width = cropW;
+        canvas.height = cropH;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.src = base64;
+    });
+  };
+
+  const processStudentFace = async (base64, isCropped = false) => {
     setLastCapBase64(base64); // Set source target photo instantly so the biometric corner box shows it!
 
     if (!rekClient || !dbClient) {
@@ -1537,6 +1571,14 @@ export default function App() {
         Image: { Bytes: imageBytes },
         Attributes: ["ALL"]
       }, (detErr, detData) => {
+        // If not cropped and multiple faces are found, transition to face picker
+        if (!isCropped && !detErr && detData.FaceDetails && detData.FaceDetails.length > 1) {
+          setOriginalPhoto(base64);
+          setDetectedFaces(detData.FaceDetails);
+          setScanState('picker');
+          return;
+        }
+
         let detected = [];
         if (!detErr && detData.FaceDetails && detData.FaceDetails.length > 0) {
           const details = detData.FaceDetails[0];
@@ -2608,9 +2650,30 @@ export default function App() {
                 <button className="btn ghost" onClick={() => { setScanState('scan'); setTimeout(() => startCamera(studentVideoRef), 100); }}>← Kembali</button>
                 <div className="unknown-layout">
                   <div className="unknown-visual">
-                    <div className="unknown-face-ring">
-                      <span>❓</span>
-                    </div>
+                    {lastCapBase64 ? (
+                      <div style={{ position: 'relative', width: '160px', height: '160px', margin: '0 auto 20px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        <img 
+                          src={lastCapBase64} 
+                          style={{ 
+                            width: '150px', 
+                            height: '150px', 
+                            borderRadius: '50%', 
+                            objectFit: 'cover', 
+                            border: '3px solid var(--red)',
+                            boxShadow: '0 0 20px rgba(255, 92, 92, 0.4)'
+                          }} 
+                          alt="Unregistered Face" 
+                        />
+                        <div className="corner-bracket tl" style={{ borderColor: 'var(--red)', filter: 'drop-shadow(0 0 2px var(--red))', top: '5px', left: '5px' }}></div>
+                        <div className="corner-bracket tr" style={{ borderColor: 'var(--red)', filter: 'drop-shadow(0 0 2px var(--red))', top: '5px', right: '5px' }}></div>
+                        <div className="corner-bracket bl" style={{ borderColor: 'var(--red)', filter: 'drop-shadow(0 0 2px var(--red))', bottom: '5px', left: '5px' }}></div>
+                        <div className="corner-bracket br" style={{ borderColor: 'var(--red)', filter: 'drop-shadow(0 0 2px var(--red))', bottom: '5px', right: '5px' }}></div>
+                      </div>
+                    ) : (
+                      <div className="unknown-face-ring">
+                        <span>❓</span>
+                      </div>
+                    )}
                     <h2>Wajah Belum Terdaftar</h2>
                     <p>Belum ada data nilai. Silakan hubungi Guru Anda untuk mendaftar.</p>
                   </div>
@@ -2626,6 +2689,61 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* 5. Multi-Face Picker */}
+            {scanState === 'picker' && (
+              <div style={{ maxWidth: '650px', margin: '0 auto', animation: 'fadeIn 0.5s ease', textAlign: 'center' }}>
+                <h2 className="big-title" style={{ fontSize: '1.8rem', marginBottom: '8px', color: 'var(--yellow)' }}>🛰️ DETEKSI MULTI-WAJAH!</h2>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.92rem', marginBottom: '20px' }}>
+                  Ditemukan <strong>{detectedFaces.length} wajah</strong>. Silakan ketuk/pilih wajah target di bawah ini untuk melihat hasil nilai & statusnya!
+                </p>
+                
+                <div className="fp-img-wrap" style={{ position: 'relative', overflow: 'hidden', borderRadius: '18px', border: '2px solid rgba(124,106,255,0.3)', boxShadow: '0 15px 50px rgba(0,0,0,0.6)', margin: '0 auto 24px' }}>
+                  <img src={originalPhoto} style={{ width: '100%', display: 'block', borderRadius: '16px' }} alt="Original Capture" />
+                  
+                  <div id="fp-boxes">
+                    {detectedFaces.map((face, index) => {
+                      const box = face.BoundingBox;
+                      const style = {
+                        left: `${(box.Left * 100).toFixed(2)}%`,
+                        top: `${(box.Top * 100).toFixed(2)}%`,
+                        width: `${(box.Width * 100).toFixed(2)}%`,
+                        height: `${(box.Height * 100).toFixed(2)}%`
+                      };
+
+                      return (
+                        <div 
+                          key={index} 
+                          className="face-box" 
+                          style={style}
+                          onClick={async () => {
+                            triggerToast(`Mengekstrak Wajah #${index + 1}...`, 'ok');
+                            const cropped = await cropFace(originalPhoto, box);
+                            processStudentFace(cropped, true);
+                          }}
+                        >
+                          <div className="fb-tag" style={{ animation: 'aiPulse 2s infinite' }}>Wajah #{index + 1}</div>
+                          <div className="corner-bracket tl" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', top: '2px', left: '2px' }}></div>
+                          <div className="corner-bracket tr" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', top: '2px', right: '2px' }}></div>
+                          <div className="corner-bracket bl" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', bottom: '2px', left: '2px' }}></div>
+                          <div className="corner-bracket br" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', bottom: '2px', right: '2px' }}></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                <button 
+                  className="btn ghost lg" 
+                  onClick={() => {
+                    setScanState('scan');
+                    setTimeout(() => startCamera(studentVideoRef), 100);
+                  }}
+                >
+                  ← Batal & Ulangi Scan
+                </button>
               </div>
             )}
 
