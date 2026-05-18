@@ -2395,9 +2395,14 @@ export default function App() {
                       <label>Kelas</label>
                       <select value={regClass} onChange={(e) => setRegClass(e.target.value)}>
                         <option value="">Pilih Kelas...</option>
-                        <option>X-A</option><option>X-B</option>
-                        <option>XI-A</option><option>XI-B</option>
-                        <option>XII-A</option><option>XII-B</option>
+                        <option value="X TKJ 1">X TKJ 1</option>
+                        <option value="X TKJ 2">X TKJ 2</option>
+                        <option value="X TKJ 3">X TKJ 3</option>
+                        <option value="XI TKJ 1">XI TKJ 1</option>
+                        <option value="XI TKJ 2">XI TKJ 2</option>
+                        <option value="XII TKJ 1">XII TKJ 1</option>
+                        <option value="XII TKJ 2">XII TKJ 2</option>
+                        <option value="XII TKJ 3">XII TKJ 3</option>
                       </select>
                     </div>
                     <div className="field">
