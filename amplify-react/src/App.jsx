@@ -1340,8 +1340,7 @@ export default function App() {
     setEditCustomTagline(s.customTagline || '');
     const initialGrades = {};
     SUBJECTS.forEach(sub => {
-      const val = getGradeValue(s, sub.key);
-      initialGrades[sub.key] = val !== '-' ? val : '';
+      initialGrades[sub.key] = ''; // Initialize empty as we want to ADD values
     });
     setEditGrades(initialGrades);
   };
@@ -1351,15 +1350,30 @@ export default function App() {
 
     try {
       let s = { ...editingStudent };
+      s.grades = { ...s.grades };
+      s.grades_history = { ...s.grades_history };
       
-      // Filter out any empty grades, saving only valid numeric ones
-      const cleanedGrades = {};
+      // We loop through the subject inputs and add/subtract from current values
       Object.entries(editGrades).forEach(([key, val]) => {
         if (val !== '' && val !== undefined && val !== null) {
-          cleanedGrades[key] = parseFloat(val);
+          const addVal = parseFloat(val);
+          if (addVal !== 0) {
+            const currentVal = getGradeValue(editingStudent, key);
+            const numericCurrentVal = (currentVal !== '-' && currentVal !== undefined && currentVal !== null) ? parseFloat(currentVal) : 80;
+            
+            // Calculate new grade, clamped to 0-100
+            const newVal = Math.max(0, Math.min(100, numericCurrentVal + addVal));
+            s.grades[key] = newVal;
+
+            // Push to history
+            s.grades_history[key] = [...(s.grades_history[key] || [])];
+            s.grades_history[key].push({
+              date: getJakartaTime(),
+              val: newVal
+            });
+          }
         }
       });
-      s.grades = cleanedGrades;
       
       s.customTitle = editCustomTitle.trim();
       s.customTagline = editCustomTagline.trim();
@@ -1378,7 +1392,7 @@ export default function App() {
         Item: s
       }));
 
-      triggerToast('Data berhasil disimpan!', 'ok');
+      triggerToast('Poin nilai berhasil ditambahkan!', 'ok');
       setEditingStudent(null);
       loadStudents();
     } catch (e) {
@@ -2541,9 +2555,13 @@ export default function App() {
         <div className="modal-bg">
           <div className="modal" style={{ maxWidth: '960px', width: '100%' }}>
             <button className="close-x" onClick={() => setEditingStudent(null)}>×</button>
-            <h2>✏️ Edit Grades & Violations</h2>
+            <h2>✏️ Add Grades & Violations</h2>
             <p style={{ color: 'var(--text2)', marginBottom: '15px' }}>{editingStudent.name} ({editingStudent.kelas})</p>
             
+            <div className="info-strip" style={{ marginBottom: '20px', background: 'rgba(124, 106, 255, 0.05)', borderLeft: '3px solid var(--accent)' }}>
+              💡 <strong>Tips Guru:</strong> Masukkan jumlah poin (misal: <code>5</code> atau <code>-5</code>) untuk ditambahkan ke nilai saat ini. Kosongkan jika tidak ada perubahan.
+            </div>
+
             <div className="field">
               <label>Catatan Pelanggaran (Pisahkan dengan koma jika lebih dari satu)</label>
               <input type="text" value={editViolations} onChange={(e) => setEditViolations(e.target.value)} placeholder="e.g. Tidur di kelas, Telat masuk gerbang" />
@@ -2561,13 +2579,56 @@ export default function App() {
             </div>
             
             <div className="subjects-grid">
-              {SUBJECTS.map(sub => (
-                <div className="subj-card" key={sub.key}>
-                  <div className="ico">{sub.icon}</div>
-                  <label>{sub.name}</label>
-                  <input type="number" value={editGrades[sub.key] === undefined || editGrades[sub.key] === '' ? '' : editGrades[sub.key]} onChange={(e) => { const v = e.target.value; setEditGrades({ ...editGrades, [sub.key]: v === '' ? '' : parseFloat(v) }); }} placeholder="—" min="0" max="100" />
-                </div>
-              ))}
+              {SUBJECTS.map(sub => {
+                const currentGrade = getGradeValue(editingStudent, sub.key);
+                const val = editGrades[sub.key];
+                const isPositive = parseFloat(val) > 0;
+                const isNegative = parseFloat(val) < 0;
+                const prefix = isNegative ? '' : '+';
+                const prefixColor = isPositive ? 'var(--green)' : (isNegative ? 'var(--red)' : 'var(--text3)');
+
+                return (
+                  <div className="subj-card" key={sub.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '16px' }}>
+                    <div className="ico" style={{ fontSize: '1.8rem', marginBottom: '4px' }}>{sub.icon}</div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text2)', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>{sub.name}</label>
+                    
+                    <div className="current-grade" style={{ fontSize: '0.85rem', color: 'var(--text3)', marginBottom: '8px' }}>
+                      Nilai: <strong style={{ color: 'var(--cyan)' }}>{currentGrade}</strong>
+                    </div>
+
+                    <div className="add-input-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }}>
+                      <span style={{ fontSize: '1.3rem', color: prefixColor, fontWeight: 'bold', transition: 'color 0.2s', width: '16px', textAlign: 'center' }}>
+                        {parseFloat(val) !== 0 && val !== '' ? prefix : ''}
+                      </span>
+                      <input 
+                        type="number" 
+                        value={editGrades[sub.key] === undefined || editGrades[sub.key] === '' ? '' : editGrades[sub.key]} 
+                        onChange={(e) => { 
+                          const v = e.target.value; 
+                          setEditGrades({ ...editGrades, [sub.key]: v === '' ? '' : parseFloat(v) }); 
+                        }} 
+                        placeholder="0" 
+                        min="-100" 
+                        max="100" 
+                        style={{ 
+                          width: '80px', 
+                          textAlign: 'center', 
+                          fontSize: '1.1rem',
+                          padding: '6px 8px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          background: 'var(--bg)',
+                          color: 'var(--text)',
+                          fontWeight: '600',
+                          borderColor: isPositive ? 'rgba(86, 255, 178, 0.4)' : (isNegative ? 'rgba(255, 92, 122, 0.4)' : 'var(--border)'),
+                          boxShadow: isPositive ? '0 0 10px rgba(86, 255, 178, 0.15)' : (isNegative ? '0 0 10px rgba(255, 92, 122, 0.15)' : 'none'),
+                          transition: 'all 0.2s ease'
+                        }} 
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             
             <button className="btn primary full" onClick={saveEditGrades}>💾 Simpan Perubahan</button>
