@@ -476,6 +476,7 @@ export default function App() {
   // Face Picker States for Multiple Faces
   const [detectedFaces, setDetectedFaces] = useState([]);
   const [originalPhoto, setOriginalPhoto] = useState(null);
+  const [resolvedNames, setResolvedNames] = useState({});
 
   // Video Refs
   const teacherVideoRef = useRef(null);
@@ -1566,6 +1567,43 @@ export default function App() {
     });
   };
 
+  const resolveFaceName = async (base64, face, index) => {
+    try {
+      const cropped = await cropFace(base64, face.BoundingBox);
+      const imageBytes = base64ToByteArray(cropped);
+      
+      rekClient.searchFacesByImage({
+        CollectionId: cfgCollection,
+        Image: { Bytes: imageBytes },
+        MaxFaces: 1,
+        FaceMatchThreshold: 80
+      }, async (err, data) => {
+        if (err || !data.FaceMatches || data.FaceMatches.length === 0) {
+          setResolvedNames(prev => ({ ...prev, [index]: 'Wajah Baru' }));
+          return;
+        }
+        
+        const studentId = data.FaceMatches[0].Face.ExternalImageId;
+        try {
+          const dbData = await dbClient.send(new GetCommand({
+            TableName: cfgTable,
+            Key: { studentId }
+          }));
+          
+          if (dbData.Item) {
+            setResolvedNames(prev => ({ ...prev, [index]: dbData.Item.name }));
+          } else {
+            setResolvedNames(prev => ({ ...prev, [index]: 'Wajah Baru' }));
+          }
+        } catch (dbErr) {
+          setResolvedNames(prev => ({ ...prev, [index]: 'Wajah Baru' }));
+        }
+      });
+    } catch (e) {
+      setResolvedNames(prev => ({ ...prev, [index]: 'Wajah Baru' }));
+    }
+  };
+
   const processStudentFace = async (base64, isCropped = false) => {
     setLastCapBase64(base64); // Set source target photo instantly so the biometric corner box shows it!
 
@@ -1590,6 +1628,15 @@ export default function App() {
         if (!isCropped && !detErr && detData.FaceDetails && detData.FaceDetails.length > 1) {
           setOriginalPhoto(base64);
           setDetectedFaces(detData.FaceDetails);
+          
+          // Trigger asynchronous background resolution of student names!
+          const initialNames = {};
+          detData.FaceDetails.forEach((face, idx) => {
+            initialNames[idx] = '🔍 Mencari...';
+            resolveFaceName(base64, face, idx);
+          });
+          setResolvedNames(initialNames);
+          
           setScanState('picker');
           return;
         }
@@ -2721,12 +2768,32 @@ export default function App() {
                   <div id="fp-boxes">
                     {detectedFaces.map((face, index) => {
                       const box = face.BoundingBox;
+                      
+                      // Add 1.5% padding expansion to make the yellow boxes frame the head beautifully instead of tight squished bars!
+                      const pad = 0.015; 
+                      const boxLeft = Math.max(0, box.Left - pad);
+                      const boxTop = Math.max(0, box.Top - pad);
+                      const boxWidth = Math.min(1 - boxLeft, box.Width + pad * 2);
+                      const boxHeight = Math.min(1 - boxTop, box.Height + pad * 2);
+
                       const style = {
-                        left: `${(box.Left * 100).toFixed(2)}%`,
-                        top: `${(box.Top * 100).toFixed(2)}%`,
-                        width: `${(box.Width * 100).toFixed(2)}%`,
-                        height: `${(box.Height * 100).toFixed(2)}%`
+                        left: `${(boxLeft * 100).toFixed(2)}%`,
+                        top: `${(boxTop * 100).toFixed(2)}%`,
+                        width: `${(boxWidth * 100).toFixed(2)}%`,
+                        height: `${(boxHeight * 100).toFixed(2)}%`,
+                        background: 'rgba(232, 200, 74, 0.08)',
+                        border: '2px solid var(--yellow)',
+                        borderRadius: '8px',
+                        boxShadow: '0 0 10px rgba(232, 200, 74, 0.2)'
                       };
+
+                      const displayName = resolvedNames[index] || '🔍 Mencari...';
+                      let tagStyle = { animation: 'aiPulse 2s infinite' };
+                      if (displayName === 'Wajah Baru') {
+                        tagStyle = { background: 'rgba(232, 74, 90, 0.9)', boxShadow: '0 0 10px rgba(232,74,90,0.5)', color: '#fff' };
+                      } else if (displayName !== '🔍 Mencari...') {
+                        tagStyle = { background: 'rgba(74, 232, 138, 0.9)', boxShadow: '0 0 10px rgba(74,232,138,0.5)', color: '#000', fontWeight: 'bold' };
+                      }
 
                       return (
                         <div 
@@ -2734,12 +2801,12 @@ export default function App() {
                           className="face-box" 
                           style={style}
                           onClick={async () => {
-                            triggerToast(`Mengekstrak Wajah #${index + 1}...`, 'ok');
+                            triggerToast(displayName !== 'Wajah Baru' && displayName !== '🔍 Mencari...' ? `Memproses data ${displayName}...` : `Mengekstrak Wajah #${index + 1}...`, 'ok');
                             const cropped = await cropFace(originalPhoto, box);
                             processStudentFace(cropped, true);
                           }}
                         >
-                          <div className="fb-tag" style={{ animation: 'aiPulse 2s infinite' }}>Wajah #{index + 1}</div>
+                          <div className="fb-tag" style={tagStyle}>{displayName}</div>
                           <div className="corner-bracket tl" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', top: '2px', left: '2px' }}></div>
                           <div className="corner-bracket tr" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', top: '2px', right: '2px' }}></div>
                           <div className="corner-bracket bl" style={{ borderColor: 'var(--yellow)', filter: 'drop-shadow(0 0 2px var(--yellow))', bottom: '2px', left: '2px' }}></div>
