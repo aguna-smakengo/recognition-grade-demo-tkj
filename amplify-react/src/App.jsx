@@ -1495,6 +1495,9 @@ export default function App() {
 
   // ── Student Screen Scan Face ──
   const snapStu = async () => {
+    setDetectedFaces([]);
+    setOriginalPhoto(null);
+
     const vid = studentVideoRef.current;
     if (!vid) return;
 
@@ -1511,6 +1514,9 @@ export default function App() {
   };
 
   const handleStuFile = (e) => {
+    setDetectedFaces([]);
+    setOriginalPhoto(null);
+
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -1519,6 +1525,15 @@ export default function App() {
       setScanState('upload-confirm');
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleBackFromResults = () => {
+    if (detectedFaces && detectedFaces.length > 1) {
+      setScanState('picker');
+    } else {
+      setScanState('scan');
+      setTimeout(() => startCamera(studentVideoRef), 100);
+    }
   };
 
   const cropFace = (base64, box) => {
@@ -2390,7 +2405,7 @@ export default function App() {
 
       {/* ═══ STUDENT SCREEN ═══ */}
       {screen === 'student' && (
-        <div className="screen active" id="student-screen" style={{ position: 'relative', overflow: 'hidden' }}>
+        <div className="screen active" id="student-screen" style={{ position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
 
           <header className="navbar student-nb">
             <div className="nb-logo" onClick={() => setScreen('splash')}>FaceGrade <span>AI</span></div>
@@ -2514,7 +2529,7 @@ export default function App() {
                    return (
                      <div>
                        <div className="res-top-bar">
-                         <button className="btn ghost" onClick={() => { setScanState('scan'); setTimeout(() => startCamera(studentVideoRef), 100); }}>← Kembali</button>
+                         <button className="btn ghost" onClick={handleBackFromResults}>← Kembali</button>
                          <div className="res-avg-pill">
                            Rata-Rata: <strong>{avgVal}</strong>
                          </div>
@@ -2647,7 +2662,7 @@ export default function App() {
             {/* 4. Unmatched Result */}
             {scanState === 'result-no' && (
               <div>
-                <button className="btn ghost" onClick={() => { setScanState('scan'); setTimeout(() => startCamera(studentVideoRef), 100); }}>← Kembali</button>
+                <button className="btn ghost" onClick={handleBackFromResults}>← Kembali</button>
                 <div className="unknown-layout">
                   <div className="unknown-visual">
                     {lastCapBase64 ? (
