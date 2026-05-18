@@ -1169,6 +1169,81 @@ export default function App() {
     setRegCustomTagline('');
   };
 
+  const handleTeacherFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      processTeacherUpload(evt.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const processTeacherUpload = async (base64) => {
+    if (!rekClient || !dbClient) {
+      triggerToast('Please configure AWS Credentials first!', 'fail');
+      return;
+    }
+
+    setLastCapBase64(base64);
+    stopCamera();
+
+    setQsMsg('MENGANALISIS WAJAH...');
+    setQsMsgType('ok');
+
+    try {
+      const imageBytes = base64ToByteArray(base64);
+      
+      const searchParams = {
+        CollectionId: cfgCollection,
+        Image: { Bytes: imageBytes },
+        MaxFaces: 1,
+        FaceMatchThreshold: 80
+      };
+
+      rekClient.searchFacesByImage(searchParams, async (err, data) => {
+        if (err) {
+          console.error(err);
+          setQsMsg('AWS Rekognition Error: ' + err.message);
+          setQsMsgType('fail');
+          return;
+        }
+
+        if (data.FaceMatches && data.FaceMatches.length > 0) {
+          const studentId = data.FaceMatches[0].Face.ExternalImageId;
+          
+          try {
+            const dbData = await dbClient.send(new GetCommand({
+              TableName: cfgTable,
+              Key: { studentId }
+            }));
+
+            if (dbData.Item) {
+              setQsStudent(dbData.Item);
+              setQsState('add-event');
+              setQsMsg('');
+            } else {
+              setRegNis(studentId);
+              setQsState('register');
+              setQsMsg('');
+            }
+          } catch (dbErr) {
+            setQsMsg('DynamoDB Error: ' + dbErr.message);
+            setQsMsgType('fail');
+          }
+        } else {
+          setRegNis('');
+          setQsState('register');
+          setQsMsg('');
+        }
+      });
+
+    } catch (e) {
+      setQsMsg('Error: ' + e.message);
+      setQsMsgType('fail');
+    }
+  };
+
   // ── Register New Student ──
   const registerStudent = async () => {
     if (!regNis || !regName || !regClass || !regReligion) {
@@ -2113,6 +2188,11 @@ export default function App() {
                           <button className="btn ghost" onClick={() => flipCamera(teacherVideoRef)}>🔄 Ganti Kamera</button>
                         </>
                       )}
+                    </div>
+                    <div className="upload-alt" style={{ marginTop: '24px' }}>
+                      <span className="divider-text">atau upload foto</span>
+                      <label className="upload-label" htmlFor="t-file">📁 Choose File</label>
+                      <input type="file" id="t-file" accept="image/*" className="hidden" onChange={handleTeacherFile} />
                     </div>
                     {qsMsg && (
                       <div className={`msg-box ${qsMsgType}`} style={{ marginTop: '16px' }}>
