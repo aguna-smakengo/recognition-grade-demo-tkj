@@ -1732,6 +1732,7 @@ export default function App() {
                 // Set result and initiate 3D zoom lock-on state
                 setMatchedStudent(dbData.Item);
                 setMatchedPhoto(base64);
+                setUnknownAttrs(detected);
                 setScanState('zooming');
                 document.body.classList.add('warp-jump');
                 
