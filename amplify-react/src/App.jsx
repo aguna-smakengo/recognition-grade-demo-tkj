@@ -4,7 +4,7 @@ import { DynamoDB } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import * as THREE from 'three';
 
-// ── WebGL Three.js Super-Detailed Galaxy Scanner ──
+// Build trigger: Re-deployment of stable baseline 0cdf8d7
 function ThreeGalaxyScanner({ scanState, screen }) {
   const mountRef = useRef(null);
   const scanStateRef = useRef(scanState);
